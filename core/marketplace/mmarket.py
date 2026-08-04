@@ -41,7 +41,7 @@ class MMarketAdapter(MarketplaceAdapter):
             ).first()
 
             images = [
-                image.image.url
+                f"https://shop.kkode.site{image.image.url}"
                 for image in variant.images.all()
             ]
 
