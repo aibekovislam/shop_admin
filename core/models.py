@@ -137,6 +137,22 @@ class Channel(models.Model):
         blank=True,
         help_text="Идентификатор адаптера интеграции (см. EPIC 5), напр. 'mmarket'",
     )
+    api_url = models.URLField(
+        blank=True,
+        help_text="URL API маркетплейса"
+    )
+
+    api_token = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Токен доступа"
+    )
+
+    branch_id = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="ID филиала маркетплейса"
+    )
     is_active = models.BooleanField(default=True)
 
     class Meta:
