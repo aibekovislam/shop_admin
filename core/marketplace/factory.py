@@ -1,15 +1,20 @@
 from .mmarket import MMarketAdapter
-from .omarket import OMarketAdapter
-from .bakaimarket import BakaiMarketAdapter
 
 
-def get_adapter(channel):
+def get_marketplace_adapter(channel):
 
-    if channel.slug == "mmarket":
-        return MMarketAdapter(channel)
+    adapters = {
+        "mmarket": MMarketAdapter,
+    }
 
-    if channel.slug == "omarket":
-        return OMarketAdapter(channel)
 
-    if channel.slug == "bakaimarket":
-        return BakaiMarketAdapter(channel)
+    adapter = adapters.get(channel.adapter_key)
+
+
+    if not adapter:
+        raise Exception(
+            f"Unknown adapter: {channel.adapter_key}"
+        )
+
+
+    return adapter(channel)

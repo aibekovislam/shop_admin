@@ -40,6 +40,9 @@ class MMarketAdapter(MarketplaceAdapter):
                 channel=self.channel
             ).first()
 
+            if not price or price.price < 0.01:
+                continue
+
             images = [
                 f"https://shop.kkode.site{image.image.url}"
                 for image in variant.images.all()
@@ -52,7 +55,11 @@ class MMarketAdapter(MarketplaceAdapter):
                 "price": str(price.price) if price else "0",
                 "description": variant.product.description,
                 "images": images,
-                "specs": variant.attributes,
+                "specs": {
+                    key: value
+                    for key, value in variant.attributes.items()
+                    if value
+                },
                 "stock": [
                     {
                         "quantity": 1 if stock and stock.in_stock else 0,
@@ -69,6 +76,9 @@ class MMarketAdapter(MarketplaceAdapter):
 
     def push_products(self):
         payload = self.build_payload()
+        print("MMARKET URL:", self.channel.api_url)
+        print("MMARKET HEADERS:", {"Authorization": f"Token {self.channel.api_token}"})
+        print("MMARKET PAYLOAD:", payload)
 
         response = requests.post(
             self.channel.api_url,

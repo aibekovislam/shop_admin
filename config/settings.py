@@ -11,7 +11,11 @@ SECRET_KEY = env('SECRET_KEY', default='django-insecure-dev-only-change-in-prod'
 
 DEBUG = env.bool('DEBUG', default=False)
 
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1'])
+ALLOWED_HOSTS = [
+    "shop.kkode.site",
+    "localhost",
+    "127.0.0.1",
+]
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -80,6 +84,7 @@ USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 # Медиафайлы (фото товаров). ВАЖНО: на проде для реальной публичной
 # доступности файлов маркетплейсам нужен HTTPS-домен, не localhost.
@@ -102,3 +107,7 @@ REST_FRAMEWORK = {
         'core.authentication.HasShopAPIKey',
     ],
 }
+
+
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+

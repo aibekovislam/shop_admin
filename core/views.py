@@ -3,6 +3,7 @@ from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from core.tasks import sync_marketplace_products
 
 from .authentication import HasShopAPIKey
 from .models import Channel, ChannelPrice, Product, ProductVariant, Shop, Stock
@@ -91,6 +92,17 @@ class BulkUpdateView(ShopScopedAPIView):
         for raw_item in changes:
             results.append(self._process_one(shop, raw_item))
 
+        channels = Channel.objects.filter(
+            shop=shop,
+            channel_type="marketplace",
+            is_active=True
+       	)
+
+
+        return Response({
+            "results": results
+        })
+
         return Response({"results": results})
 
     def _process_one(self, shop, raw_item):
@@ -163,7 +175,17 @@ class CreateVariantView(ShopScopedAPIView):
                 in_stock=data.get("in_stock", False),
             )
 
+            channels = Channel.objects.filter(
+            shop=shop,
+            channel_type="marketplace",
+            is_active=True
+        )
+
         return Response(
-            {"variant_id": variant.id, "sku": variant.sku, "product_id": product.id},
+            {
+                "variant_id": variant.id,
+                "sku": variant.sku,
+                "product_id": product.id
+            },
             status=status.HTTP_201_CREATED,
         )
