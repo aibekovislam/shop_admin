@@ -92,7 +92,6 @@ M-Market: 1 запрос в 15 минут.
   "цвет": "чёрный",
   "память": "128GB",
   "omarket_category_id": 1,
-  "omarket_partner_type": "product",
   "omarket_width": 10,
   "omarket_height": 5,
   "omarket_length": 15,
@@ -106,8 +105,7 @@ M-Market: 1 запрос в 15 минут.
 }
 ```
 
-`omarket_attributes` необязателен, но `omarket_category_id`,
-`omarket_partner_type` и габариты нужны для импорта. Action `Отправить
-выбранные каналы в маркетплейс` использует endpoint
-`/api/mia/v1/product/import/create-or-update/`, поэтому отсутствующие в
-выгрузке товары не деактивируются.
+`omarket_attributes` необязателен, но `omarket_category_id` и габариты нужны
+для импорта. Action `Отправить выбранные каналы в маркетплейс` использует
+endpoint `/api/mia/v1/product/import/create-or-update/`, поэтому отсутствующие
+в выгрузке товары не деактивируются.
