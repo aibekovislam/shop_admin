@@ -74,3 +74,38 @@ roadmap.md.
 Синхронизация отправляет все товары с ценой для выбранного канала одним
 запросом. Автоматической отправки при каждом сохранении нет из-за лимита
 M-Market: 1 запрос в 15 минут.
+
+## O!Market
+
+1. В админке создайте канал (`Channels`) для нужного магазина:
+   - `name`: `O!Market`
+   - `channel_type`: `Маркетплейс`
+   - `adapter_key`: `omarket`
+   - `api_url`: `https://stage-api-market.o.kg/` для теста или `https://api-market.o.kg/` для прода
+   - `api_token`: токен O!Market
+2. В карточке SKU (`Product variants`) заполните фото, описание, наличие и
+   цену канала `O!Market`.
+3. В `attributes` SKU добавьте обязательные поля O!Market:
+
+```json
+{
+  "цвет": "чёрный",
+  "память": "128GB",
+  "omarket_category_id": 1,
+  "omarket_width": 10,
+  "omarket_height": 5,
+  "omarket_length": 15,
+  "omarket_weight": 0.5,
+  "omarket_attributes": [
+    {
+      "attribute_id": 1208,
+      "value_id": 8132
+    }
+  ]
+}
+```
+
+`omarket_attributes` необязателен, но `omarket_category_id` и габариты нужны
+для импорта. Action `Отправить выбранные каналы в маркетплейс` использует
+endpoint `/api/mia/v1/product/import/create-or-update/`, поэтому отсутствующие
+в выгрузке товары не деактивируются.

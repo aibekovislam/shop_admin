@@ -102,7 +102,7 @@ class StockInline(ShopScopedAdminMixin, admin.TabularInline):
 
 
 class ChannelPriceInline(ShopScopedAdminMixin, admin.TabularInline):
-    """Цена канала, например MMarket Turan, прямо на странице SKU."""
+    """Цена канала, например MMarket/O!Market, прямо на странице SKU."""
 
     model = ChannelPrice
     extra = 1
@@ -136,15 +136,15 @@ class ProductVariantAdmin(admin.ModelAdmin):
 class ChannelAdmin(ShopScopedAdminMixin, admin.ModelAdmin):
     list_display = ("shop", "name", "channel_type", "adapter_key", "api_url", "branch_id", "is_active")
     list_filter = ("channel_type", "is_active")
-    actions = ["sync_mmarket_products"]
+    actions = ["sync_marketplace_products"]
 
-    @admin.action(description="Отправить товары в M-Market")
-    def sync_mmarket_products(self, request, queryset):
+    @admin.action(description="Отправить товары в маркетплейс")
+    def sync_marketplace_products(self, request, queryset):
         for channel in queryset:
-            if channel.adapter_key != "mmarket":
+            if not channel.adapter_key:
                 self.message_user(
                     request,
-                    f"{channel}: пропущен, adapter_key должен быть 'mmarket'.",
+                    f"{channel}: пропущен, adapter_key не заполнен.",
                     level=messages.WARNING,
                 )
                 continue
@@ -190,18 +190,17 @@ class ChannelPriceAdmin(ShopScopedAdminMixin, admin.ModelAdmin):
     list_filter = ("shop", "channel")
     search_fields = ("variant__sku", "variant__product__name")
     list_per_page = 1000
-    actions = ["sync_selected_channels_to_mmarket"]
+    actions = ["sync_selected_channels_to_marketplace"]
 
-    @admin.action(description="Отправить выбранные каналы в M-Market")
-    def sync_selected_channels_to_mmarket(self, request, queryset):
+    @admin.action(description="Отправить выбранные каналы в маркетплейс")
+    def sync_selected_channels_to_marketplace(self, request, queryset):
         channels = Channel.objects.filter(
             id__in=queryset.values_list("channel_id", flat=True),
-            adapter_key="mmarket",
-        )
+        ).exclude(adapter_key="")
         if not channels.exists():
             self.message_user(
                 request,
-                "Среди выбранных цен нет канала с adapter_key='mmarket'.",
+                "Среди выбранных цен нет канала с заполненным adapter_key.",
                 level=messages.WARNING,
             )
             return

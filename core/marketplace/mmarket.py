@@ -131,6 +131,8 @@ class MMarketAdapter(MarketplaceAdapter):
             headers={
                 "Authorization": f"Token {self.channel.api_token}",
                 "Content-Type": "application/json",
+                "Accept": "application/json",
+                "User-Agent": "ShopAdminMMarketImporter/1.0",
             },
             method="POST",
         )

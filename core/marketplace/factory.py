@@ -1,10 +1,12 @@
 from .mmarket import MMarketAdapter
+from .omarket import OMarketAdapter
 
 
 def get_marketplace_adapter(channel):
 
     adapters = {
         "mmarket": MMarketAdapter,
+        "omarket": OMarketAdapter,
     }
 
 
