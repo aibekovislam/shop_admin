@@ -76,6 +76,7 @@ class OMarketAdapter(MarketplaceAdapter):
                 "title": product_model.name,
                 "description": product_model.description or "",
                 "category_id": int(attrs["omarket_category_id"]),
+                "partner_type": attrs["omarket_partner_type"],
                 "price": float(price.price),
                 "quantity": 1 if stock and stock.in_stock else 0,
                 "images": images,
@@ -118,6 +119,8 @@ class OMarketAdapter(MarketplaceAdapter):
             errors.append("в attributes нужно указать omarket_category_id")
         elif not self.is_positive_integer(attrs["omarket_category_id"]):
             errors.append("omarket_category_id должен быть положительным числом")
+        if not attrs.get("omarket_partner_type"):
+            errors.append("в attributes нужно указать omarket_partner_type")
         for field_name in ("omarket_width", "omarket_height", "omarket_length", "omarket_weight"):
             if attrs.get(field_name) in (0, "0"):
                 errors.append(f"{field_name} должен быть больше 0")
