@@ -52,6 +52,7 @@ class OMarketAdapter(MarketplaceAdapter):
 
         products = []
         errors = []
+        partner_type = None
         for price in prices:
             variant = price.variant
             product_model = variant.product
@@ -71,6 +72,7 @@ class OMarketAdapter(MarketplaceAdapter):
                 errors.append(f"{variant.sku}: {', '.join(product_errors)}")
                 continue
 
+            partner_type = partner_type or attrs["omarket_partner_type"]
             item = {
                 "sku": variant.sku,
                 "title": product_model.name,
@@ -105,7 +107,7 @@ class OMarketAdapter(MarketplaceAdapter):
         if not products:
             raise ValidationError("Нет товаров с ценой для выгрузки в O!Market.")
 
-        return {"products": products}
+        return {"partner_type": partner_type, "products": products}
 
     def validate_product(self, product, variant, attrs, images):
         errors = []
