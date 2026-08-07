@@ -90,6 +90,7 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 # доступности файлов маркетплейсам нужен HTTPS-домен, не localhost.
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+PUBLIC_MEDIA_BASE_URL = env('PUBLIC_MEDIA_BASE_URL', default='https://shop.kkode.site')
 
 # Celery — фоновые задачи (пуш цен на маркетплейсы и т.п., см. EPIC 5)
 CELERY_BROKER_URL = env('REDIS_URL', default='redis://localhost:6379/0')
@@ -110,4 +111,3 @@ REST_FRAMEWORK = {
 
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-
