@@ -25,7 +25,7 @@ class KeyValueJSONWidget(forms.Widget):
                 continue
             result[key] = value
 
-        return result
+        return json.dumps(result, ensure_ascii=False)
 
     def get_list(self, data, key):
         if hasattr(data, "getlist"):
