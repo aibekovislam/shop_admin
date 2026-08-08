@@ -69,6 +69,18 @@ class ShopAPIKeyAdmin(ShopScopedAdminMixin, admin.ModelAdmin):
     readonly_fields = ("key", "created_at", "last_used_at")
 
 
+class ProductAdminForm(forms.ModelForm):
+    class Meta:
+        model = Product
+        fields = "__all__"
+
+    def clean_description(self):
+        description = self.cleaned_data.get("description") or ""
+        if len(description) < 50:
+            raise ValidationError("Описание товара должно быть минимум 50 символов.")
+        return description
+
+
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
     """
@@ -78,6 +90,7 @@ class ProductAdmin(admin.ModelAdmin):
     товара в разных магазинах.
     """
 
+    form = ProductAdminForm
     list_display = ("name", "category", "created_at")
     search_fields = ("name", "category")
 
