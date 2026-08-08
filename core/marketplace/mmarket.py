@@ -68,7 +68,7 @@ class MMarketAdapter(MarketplaceAdapter):
             stock = stock_by_variant.get(variant.id)
 
             images = [f"{public_base_url}{image.image.url}" for image in variant.images.all()]
-            specs = self.build_specs(variant.attributes or {})
+            specs = self.build_specs(product_model, variant.attributes or {})
 
             product_errors = self.validate_product(product_model, variant, images, specs)
             if product_errors:
@@ -102,12 +102,38 @@ class MMarketAdapter(MarketplaceAdapter):
             "products": products
         }
 
-    def build_specs(self, attributes):
-        return {
+    def build_specs(self, product, attributes):
+        specs = {
             key: value
             for key, value in attributes.items()
             if value and not key.startswith("omarket_")
         }
+        normalized_specs = {
+            self.normalize_spec_key(key): value
+            for key, value in specs.items()
+        }
+
+        if product.category and not normalized_specs.get("Тип"):
+            normalized_specs["Тип"] = product.category
+        if product.name and not normalized_specs.get("Модель"):
+            normalized_specs["Модель"] = product.name
+
+        return normalized_specs
+
+    def normalize_spec_key(self, key):
+        aliases = {
+            "тип": "Тип",
+            "производитель": "Производители",
+            "производители": "Производители",
+            "бренд": "Производители",
+            "brand": "Производители",
+            "модель": "Модель",
+            "model": "Модель",
+            "цвет": "Цвет",
+            "color": "Цвет",
+        }
+        normalized_key = str(key).strip()
+        return aliases.get(normalized_key.lower(), normalized_key)
 
     def validate_product(self, product, variant, images, specs):
         errors = []
