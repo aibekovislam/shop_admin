@@ -3,6 +3,8 @@ from django.contrib import messages
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from django.core.exceptions import ValidationError
 from django.db import models as db_models
+from django import forms
+from django.utils.html import format_html
 from django_json_widget.widgets import JSONEditorWidget
 
 from .marketplace.factory import get_marketplace_adapter
@@ -89,7 +91,18 @@ class ProductImageInline(admin.TabularInline):
 
     model = ProductImage
     extra = 1
-    fields = ("image", "is_primary", "order")
+    fields = ("image", "image_preview", "is_primary", "order")
+    readonly_fields = ("image_preview",)
+
+    def image_preview(self, obj):
+        if obj.image:
+            return format_html(
+                '<img src="{}" style="max-width: 110px; max-height: 110px; object-fit: contain;" />',
+                obj.image.url,
+            )
+        return "-"
+
+    image_preview.short_description = "Превью"
 
 
 class StockInline(ShopScopedAdminMixin, admin.TabularInline):
@@ -100,6 +113,11 @@ class StockInline(ShopScopedAdminMixin, admin.TabularInline):
     fields = ("shop", "wholesale_price", "quantity", "in_stock", "updated_at")
     readonly_fields = ("updated_at",)
 
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "shop" and not request.user.is_superuser and request.user.shop_id:
+            kwargs["queryset"] = Shop.objects.filter(id=request.user.shop_id)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
 
 class ChannelPriceInline(ShopScopedAdminMixin, admin.TabularInline):
     """Цена канала, например MMarket/O!Market, прямо на странице SKU."""
@@ -109,27 +127,175 @@ class ChannelPriceInline(ShopScopedAdminMixin, admin.TabularInline):
     fields = ("shop", "channel", "price", "last_synced_at", "last_sync_error")
     readonly_fields = ("last_synced_at", "last_sync_error")
 
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if not request.user.is_superuser and request.user.shop_id:
+            if db_field.name == "shop":
+                kwargs["queryset"] = Shop.objects.filter(id=request.user.shop_id)
+            if db_field.name == "channel":
+                kwargs["queryset"] = Channel.objects.filter(shop_id=request.user.shop_id, is_active=True)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+
+class ProductVariantAdminForm(forms.ModelForm):
+    """
+    Удобная форма SKU: можно создать или обновить связанную Product-карточку
+    прямо с экрана варианта, как в старой товарной админке.
+    """
+
+    product = forms.ModelChoiceField(
+        queryset=Product.objects.all(),
+        required=False,
+        label="Существующий продукт",
+        help_text="Выберите, только если добавляете новый SKU к уже созданной карточке.",
+    )
+    product_name = forms.CharField(label="Название товара", required=False, max_length=255)
+    product_category = forms.CharField(label="Категория", required=False, max_length=255)
+    product_description = forms.CharField(
+        label="Описание",
+        required=False,
+        widget=forms.Textarea(attrs={"rows": 5}),
+    )
+
+    class Meta:
+        model = ProductVariant
+        fields = (
+            "product",
+            "product_name",
+            "product_category",
+            "product_description",
+            "sku",
+            "attributes",
+            "is_active",
+        )
+        widgets = {
+            "attributes": JSONEditorWidget,
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.pk and self.instance.product_id:
+            product = self.instance.product
+            self.fields["product_name"].initial = product.name
+            self.fields["product_category"].initial = product.category
+            self.fields["product_description"].initial = product.description
+
+    def clean(self):
+        cleaned_data = super().clean()
+        product = cleaned_data.get("product")
+        product_name = cleaned_data.get("product_name")
+        if not product and not product_name:
+            raise ValidationError("Укажите название товара или выберите существующий продукт.")
+        return cleaned_data
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        product = self.cleaned_data.get("product") or getattr(instance, "product", None)
+
+        if product is None:
+            product = Product.objects.create(
+                name=self.cleaned_data["product_name"],
+                category=self.cleaned_data.get("product_category", ""),
+                description=self.cleaned_data.get("product_description", ""),
+            )
+        else:
+            product_name = self.cleaned_data.get("product_name")
+            if product_name:
+                product.name = product_name
+                product.category = self.cleaned_data.get("product_category", "")
+                product.description = self.cleaned_data.get("product_description", "")
+                product.save(update_fields=["name", "category", "description", "updated_at"])
+
+        instance.product = product
+        if commit:
+            instance.save()
+            self.save_m2m()
+        return instance
+
 
 @admin.register(ProductVariant)
 class ProductVariantAdmin(admin.ModelAdmin):
-    list_display = ("product", "sku", "attributes", "is_active", "photo_count", "mmarket_prices")
-    search_fields = ("sku", "product__name")
-    list_filter = ("is_active",)
+    form = ProductVariantAdminForm
+    list_display = (
+        "product",
+        "sku",
+        "product_category",
+        "stock_summary",
+        "channel_prices_summary",
+        "is_active",
+        "photo_count",
+        "first_image_preview",
+    )
+    search_fields = ("sku", "product__name", "product__category")
+    readonly_fields = ("product_id_display", "first_image_preview", "created_at")
+    list_filter = ("is_active", "product__category")
     inlines = [ProductImageInline, StockInline, ChannelPriceInline]
     formfield_overrides = {
         db_models.JSONField: {"widget": JSONEditorWidget},
     }
+    fieldsets = (
+        ("Информация о товаре", {
+            "fields": ("product_id_display", "product", "product_name", "product_category", "product_description"),
+        }),
+        ("SKU и характеристики", {
+            "fields": ("sku", "attributes", "is_active", "created_at"),
+        }),
+        ("Превью", {
+            "fields": ("first_image_preview",),
+        }),
+    )
+
+    def get_queryset(self, request):
+        return (
+            super()
+            .get_queryset(request)
+            .select_related("product")
+            .prefetch_related("images", "stocks__shop", "channel_prices__channel")
+        )
+
+    def product_id_display(self, obj):
+        if obj and obj.pk:
+            return format_html("<strong>ID SKU: {}</strong>", obj.pk)
+        return "Новый SKU"
+
+    product_id_display.short_description = "ID"
+
+    def product_category(self, obj):
+        return obj.product.category or "-"
+
+    product_category.short_description = "Категория"
 
     def photo_count(self, obj):
         return obj.images.count()
 
     photo_count.short_description = "Фото"
 
-    def mmarket_prices(self, obj):
-        prices = obj.channel_prices.filter(channel__adapter_key="mmarket").select_related("channel")
+    def stock_summary(self, obj):
+        stocks = obj.stocks.select_related("shop")
+        return ", ".join(
+            f"{stock.shop.name}: {stock.marketplace_quantity}"
+            for stock in stocks
+        ) or "-"
+
+    stock_summary.short_description = "Остатки"
+
+    def channel_prices_summary(self, obj):
+        prices = obj.channel_prices.select_related("channel")
         return ", ".join(f"{price.channel.name}: {price.price}" for price in prices) or "-"
 
-    mmarket_prices.short_description = "M-Market цены"
+    channel_prices_summary.short_description = "Цены каналов"
+
+    def first_image_preview(self, obj):
+        if not obj or not obj.pk:
+            return "-"
+        image = obj.images.first()
+        if not image:
+            return "-"
+        return format_html(
+            '<img src="{}" style="max-width: 150px; max-height: 150px; object-fit: contain;" />',
+            image.image.url,
+        )
+
+    first_image_preview.short_description = "Превью"
 
 
 @admin.register(Channel)
