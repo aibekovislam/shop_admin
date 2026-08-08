@@ -84,7 +84,7 @@ class MMarketAdapter(MarketplaceAdapter):
                 "specs": specs,
                 "stock": [
                     {
-                        "quantity": 1 if stock and stock.in_stock else 0,
+                        "quantity": stock.marketplace_quantity if stock else 0,
                         "branch_id": self.channel.branch_id,
                     }
                 ],

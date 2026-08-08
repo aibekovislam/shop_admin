@@ -97,7 +97,7 @@ class StockInline(ShopScopedAdminMixin, admin.TabularInline):
 
     model = Stock
     extra = 1
-    fields = ("shop", "wholesale_price", "in_stock", "updated_at")
+    fields = ("shop", "wholesale_price", "quantity", "in_stock", "updated_at")
     readonly_fields = ("updated_at",)
 
 
@@ -166,8 +166,8 @@ class StockAdmin(ShopScopedAdminMixin, admin.ModelAdmin):
     Save на все изменённые строки.
     """
 
-    list_display = ("variant", "shop", "wholesale_price", "in_stock", "updated_at")
-    list_editable = ("wholesale_price", "in_stock")
+    list_display = ("variant", "shop", "wholesale_price", "quantity", "in_stock", "updated_at")
+    list_editable = ("wholesale_price", "quantity", "in_stock")
     list_filter = ("shop", "in_stock")
     search_fields = ("variant__sku", "variant__product__name")
     list_per_page = 1000

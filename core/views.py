@@ -3,10 +3,9 @@ from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from core.tasks import sync_marketplace_products
 
 from .authentication import HasShopAPIKey
-from .models import Channel, ChannelPrice, Product, ProductVariant, Shop, Stock
+from .models import ChannelPrice, Product, ProductVariant, Shop, Stock
 from .serializers import (
     BulkUpdateItemSerializer,
     CreateVariantSerializer,
@@ -92,18 +91,9 @@ class BulkUpdateView(ShopScopedAPIView):
         for raw_item in changes:
             results.append(self._process_one(shop, raw_item))
 
-        channels = Channel.objects.filter(
-            shop=shop,
-            channel_type="marketplace",
-            is_active=True
-       	)
-
-
         return Response({
             "results": results
         })
-
-        return Response({"results": results})
 
     def _process_one(self, shop, raw_item):
         item_serializer = BulkUpdateItemSerializer(data=raw_item)
@@ -121,10 +111,12 @@ class BulkUpdateView(ShopScopedAPIView):
             with transaction.atomic():
                 variant = ProductVariant.objects.get(id=variant_id)
 
-                if "wholesale_price" in data or "in_stock" in data:
+                if "wholesale_price" in data or "quantity" in data or "in_stock" in data:
                     stock, _ = Stock.objects.get_or_create(variant=variant, shop=shop)
                     if "wholesale_price" in data:
                         stock.wholesale_price = data["wholesale_price"]
+                    if "quantity" in data:
+                        stock.quantity = data["quantity"]
                     if "in_stock" in data:
                         stock.in_stock = data["in_stock"]
                     stock.save()
@@ -172,14 +164,9 @@ class CreateVariantView(ShopScopedAPIView):
                 variant=variant,
                 shop=shop,
                 wholesale_price=data.get("wholesale_price"),
+                quantity=data.get("quantity", 0),
                 in_stock=data.get("in_stock", False),
             )
-
-            channels = Channel.objects.filter(
-            shop=shop,
-            channel_type="marketplace",
-            is_active=True
-        )
 
         return Response(
             {

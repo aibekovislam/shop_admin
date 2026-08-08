@@ -172,6 +172,10 @@ class Stock(models.Model):
     shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name="stocks")
 
     wholesale_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    quantity = models.PositiveIntegerField(
+        default=0,
+        help_text="Фактическое количество товара. В маркетплейсы уходит 0, если in_stock выключен.",
+    )
     in_stock = models.BooleanField(default=False)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -181,7 +185,11 @@ class Stock(models.Model):
         verbose_name_plural = "Stock"
 
     def __str__(self):
-        return f"{self.variant} @ {self.shop} — {'in stock' if self.in_stock else 'out of stock'}"
+        return f"{self.variant} @ {self.shop} — {self.marketplace_quantity} pcs"
+
+    @property
+    def marketplace_quantity(self):
+        return self.quantity if self.in_stock else 0
 
 
 class ChannelPrice(models.Model):

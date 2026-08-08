@@ -77,7 +77,7 @@ class OMarketAdapter(MarketplaceAdapter):
                 "description": product_model.description or "",
                 "category_id": int(attrs["omarket_category_id"]),
                 "price": float(price.price),
-                "quantity": 1 if stock and stock.in_stock else 0,
+                "quantity": stock.marketplace_quantity if stock else 0,
                 "images": images,
                 "width": self.positive_number(attrs.get("omarket_width", 1)),
                 "height": self.positive_number(attrs.get("omarket_height", 1)),

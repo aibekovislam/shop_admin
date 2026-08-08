@@ -29,6 +29,7 @@ class VariantListSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source="product.name", read_only=True)
     images = ProductImageSerializer(many=True, read_only=True)
     wholesale_price = serializers.SerializerMethodField()
+    quantity = serializers.SerializerMethodField()
     in_stock = serializers.SerializerMethodField()
     channel_prices = serializers.SerializerMethodField()
 
@@ -41,6 +42,7 @@ class VariantListSerializer(serializers.ModelSerializer):
             "attributes",
             "images",
             "wholesale_price",
+            "quantity",
             "in_stock",
             "channel_prices",
         ]
@@ -58,6 +60,10 @@ class VariantListSerializer(serializers.ModelSerializer):
         stock = self.get_stock(obj)
         return stock.in_stock if stock else False
 
+    def get_quantity(self, obj):
+        stock = self.get_stock(obj)
+        return stock.quantity if stock else 0
+
     def get_channel_prices(self, obj):
         prices = self.context.get("prices_by_variant", {}).get(obj.id, [])
         return ChannelPriceSerializer(prices, many=True).data
@@ -73,6 +79,7 @@ class BulkUpdateItemSerializer(serializers.Serializer):
 
     variant_id = serializers.IntegerField()
     wholesale_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
+    quantity = serializers.IntegerField(min_value=0, required=False)
     in_stock = serializers.BooleanField(required=False)
     # channel_id -> price, например {"3": "79990.00", "4": "81990.00"}
     channel_prices = serializers.DictField(
@@ -93,6 +100,7 @@ class CreateVariantSerializer(serializers.Serializer):
     sku = serializers.CharField(max_length=100)
     attributes = serializers.DictField(required=False, default=dict)
     wholesale_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
+    quantity = serializers.IntegerField(min_value=0, required=False, default=0)
     in_stock = serializers.BooleanField(required=False, default=False)
 
     def validate_sku(self, value):
