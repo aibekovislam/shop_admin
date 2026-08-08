@@ -262,11 +262,21 @@ class ProductVariantAdmin(admin.ModelAdmin):
         "channel_prices_summary",
         "is_active",
         "photo_count",
+        "created_at",
         "first_image_preview",
     )
     search_fields = ("sku", "product__name", "product__category")
     readonly_fields = ("product_id_display", "first_image_preview", "created_at")
-    list_filter = ("is_active", "product__category")
+    list_filter = (
+        "is_active",
+        "product__category",
+        "stocks__shop",
+        "stocks__in_stock",
+        "channel_prices__channel",
+        "created_at",
+    )
+    ordering = ("-created_at", "-id")
+    date_hierarchy = "created_at"
     inlines = [ProductImageInline, StockInline, ChannelPriceInline]
     fieldsets = (
         ("Информация о товаре", {
