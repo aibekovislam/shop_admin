@@ -163,7 +163,7 @@ class ProductVariantAdminForm(forms.ModelForm):
         label="Описание товара",
         required=False,
         widget=forms.Textarea(attrs={"rows": 5}),
-        help_text="Для выбранного существующего продукта пустое поле оставит старое описание.",
+        help_text="Минимум 50 символов. Для выбранного существующего продукта пустое поле оставит старое описание.",
     )
 
     class Meta:
@@ -193,8 +193,16 @@ class ProductVariantAdminForm(forms.ModelForm):
         cleaned_data = super().clean()
         product = cleaned_data.get("product")
         product_name = cleaned_data.get("product_name")
+        product_description = cleaned_data.get("product_description")
         if not product and not product_name:
             raise ValidationError("Укажите название товара или выберите существующий продукт.")
+
+        final_description = product_description
+        if not final_description and product:
+            final_description = product.description
+        if len(final_description or "") < 50:
+            self.add_error("product_description", "Описание товара должно быть минимум 50 символов.")
+
         return cleaned_data
 
     def save(self, commit=True):
