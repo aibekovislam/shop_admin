@@ -18,6 +18,7 @@ from core.models import (
 
 class MMarketAdapter(MarketplaceAdapter):
     DEFAULT_API_URL = "https://m-market.kg/api/crm/products/import_products/"
+    REQUIRED_SPEC_KEYS = ("Тип", "Производители", "Модель", "Цвет")
 
     def __init__(self, channel):
         self.channel = channel
@@ -67,7 +68,7 @@ class MMarketAdapter(MarketplaceAdapter):
             stock = stock_by_variant.get(variant.id)
 
             images = [f"{public_base_url}{image.image.url}" for image in variant.images.all()]
-            specs = {key: value for key, value in variant.attributes.items() if value}
+            specs = self.build_specs(variant.attributes or {})
 
             product_errors = self.validate_product(product_model, variant, images, specs)
             if product_errors:
@@ -101,6 +102,13 @@ class MMarketAdapter(MarketplaceAdapter):
             "products": products
         }
 
+    def build_specs(self, attributes):
+        return {
+            key: value
+            for key, value in attributes.items()
+            if value and not key.startswith("omarket_")
+        }
+
     def validate_product(self, product, variant, images, specs):
         errors = []
         if not variant.sku:
@@ -118,8 +126,12 @@ class MMarketAdapter(MarketplaceAdapter):
         ]
         if invalid_images:
             errors.append("фото должны быть прямыми ссылками .jpg, .png или .webp")
-        if not specs:
-            errors.append("нужно заполнить характеристики")
+        missing_spec_keys = [key for key in self.REQUIRED_SPEC_KEYS if not specs.get(key)]
+        if missing_spec_keys:
+            errors.append(
+                "для M-Market нужно заполнить характеристики: "
+                + ", ".join(missing_spec_keys)
+            )
         return errors
 
     def push_products(self):

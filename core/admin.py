@@ -260,6 +260,10 @@ class ProductVariantAdmin(admin.ModelAdmin):
         }),
         ("SKU и характеристики", {
             "fields": ("sku", "attributes", "is_active", "created_at"),
+            "description": (
+                "Для M-Market обязательны ключи характеристик: Тип, Производители, Модель, Цвет. "
+                "Пишите ключи точно с большой буквы."
+            ),
         }),
     )
 
