@@ -1,5 +1,6 @@
 from .mmarket import MMarketAdapter
 from .omarket import OMarketAdapter
+from .bakai import BakaiMarketAdapter
 
 
 def get_marketplace_adapter(channel):
@@ -7,6 +8,7 @@ def get_marketplace_adapter(channel):
     adapters = {
         "mmarket": MMarketAdapter,
         "omarket": OMarketAdapter,
+        "bakai": BakaiMarketAdapter,
     }
 
 

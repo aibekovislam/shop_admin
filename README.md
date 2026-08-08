@@ -129,6 +129,32 @@ M-Market: 1 запрос в 15 минут.
 endpoint `/api/mia/v1/product/import/create-or-update/`, поэтому отсутствующие
 в выгрузке товары не деактивируются.
 
+## Bakai Market
+
+1. В админке создайте канал (`Channels`) для нужного магазина:
+   - `name`: `Bakai Market`
+   - `channel_type`: `Маркетплейс`
+   - `adapter_key`: `bakai`
+   - `api_url`: `https://api.bakai.store/product-service-go/v1/merchant-api/create`
+   - `api_token`: токен Bakai Market
+   - `branch_id`: ID филиала Bakai Market
+2. В карточке SKU (`Product variants`) заполните описание товара, категорию,
+   минимум 3 фото, наличие, количество и цену канала `Bakai Market`.
+3. В `attributes` SKU укажите бренд одним из ключей:
+
+```json
+{
+  "Бренд": "Apple",
+  "Цвет": "Чёрный",
+  "Память": "128GB"
+}
+```
+
+Также поддерживаются ключи `brand`, `Производитель`, `Производители`. Бренд
+уйдёт в обязательное поле `brand_name`, остальные обычные характеристики
+уйдут в `attributes` формата `{"name": "...", "value": "..."}`. Поля с
+префиксами `omarket_` и `bakai_` в характеристики Bakai Market не отправляются.
+
 ## Остатки
 
 Количество товара меняется в `Stock`:
