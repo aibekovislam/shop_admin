@@ -1,0 +1,101 @@
+<div class="kv-json-widget" data-widget-name="{{ widget.name }}">
+  <div class="kv-json-rows">
+    {% for key, value in widget.pairs %}
+      <div class="kv-json-row">
+        <input type="text" name="{{ widget.name }}_key" value="{{ key }}" placeholder="Ключ" class="vTextField">
+        <input type="text" name="{{ widget.name }}_value" value="{{ value }}" placeholder="Значение" class="vTextField">
+        <button type="button" class="button kv-json-remove">Удалить</button>
+      </div>
+    {% endfor %}
+  </div>
+  <button type="button" class="button kv-json-add">Добавить характеристику</button>
+  <textarea name="{{ widget.name }}" hidden>{{ widget.json_value }}</textarea>
+</div>
+
+<style>
+  .kv-json-widget {
+    display: grid;
+    gap: 10px;
+    max-width: 920px;
+  }
+
+  .kv-json-rows {
+    display: grid;
+    gap: 8px;
+  }
+
+  .kv-json-row {
+    display: grid;
+    grid-template-columns: minmax(160px, 260px) minmax(220px, 1fr) auto;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .kv-json-row input {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  @media (max-width: 720px) {
+    .kv-json-row {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<script>
+  (function () {
+    function sync(widget) {
+      const result = {};
+      widget.querySelectorAll(".kv-json-row").forEach(function (row) {
+        const key = row.querySelector('[name$="_key"]').value.trim();
+        const value = row.querySelector('[name$="_value"]').value.trim();
+        if (key || value) {
+          result[key] = value;
+        }
+      });
+      widget.querySelector("textarea").value = JSON.stringify(result);
+    }
+
+    function attach(widget) {
+      if (widget.dataset.initialized === "true") {
+        return;
+      }
+      widget.dataset.initialized = "true";
+
+      widget.addEventListener("input", function () {
+        sync(widget);
+      });
+
+      widget.addEventListener("click", function (event) {
+        if (event.target.classList.contains("kv-json-add")) {
+          const row = document.createElement("div");
+          row.className = "kv-json-row";
+          row.innerHTML = [
+            '<input type="text" name="' + widget.dataset.widgetName + '_key" placeholder="Ключ" class="vTextField">',
+            '<input type="text" name="' + widget.dataset.widgetName + '_value" placeholder="Значение" class="vTextField">',
+            '<button type="button" class="button kv-json-remove">Удалить</button>'
+          ].join("");
+          widget.querySelector(".kv-json-rows").appendChild(row);
+          sync(widget);
+        }
+
+        if (event.target.classList.contains("kv-json-remove")) {
+          const rows = widget.querySelectorAll(".kv-json-row");
+          if (rows.length === 1) {
+            rows[0].querySelectorAll("input").forEach(function (input) {
+              input.value = "";
+            });
+          } else {
+            event.target.closest(".kv-json-row").remove();
+          }
+          sync(widget);
+        }
+      });
+
+      sync(widget);
+    }
+
+    document.querySelectorAll(".kv-json-widget").forEach(attach);
+  })();
+</script>

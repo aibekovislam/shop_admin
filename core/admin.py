@@ -2,11 +2,10 @@ from django.contrib import admin
 from django.contrib import messages
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from django.core.exceptions import ValidationError
-from django.db import models as db_models
 from django import forms
 from django.utils.html import format_html
-from django_json_widget.widgets import JSONEditorWidget
 
+from .forms import KeyValueJSONWidget
 from .marketplace.factory import get_marketplace_adapter
 from .models import (
     Channel,
@@ -168,7 +167,7 @@ class ProductVariantAdminForm(forms.ModelForm):
             "is_active",
         )
         widgets = {
-            "attributes": JSONEditorWidget,
+            "attributes": KeyValueJSONWidget,
         }
 
     def __init__(self, *args, **kwargs):
@@ -229,9 +228,6 @@ class ProductVariantAdmin(admin.ModelAdmin):
     readonly_fields = ("product_id_display", "first_image_preview", "created_at")
     list_filter = ("is_active", "product__category")
     inlines = [ProductImageInline, StockInline, ChannelPriceInline]
-    formfield_overrides = {
-        db_models.JSONField: {"widget": JSONEditorWidget},
-    }
     fieldsets = (
         ("Информация о товаре", {
             "fields": ("product_id_display", "product", "product_name", "product_category", "product_description"),

@@ -106,6 +106,10 @@ M-Market: 1 запрос в 15 минут.
 }
 ```
 
+В админке `attributes` заполняются не сырым JSON, а строками `Ключ` /
+`Значение`. Например: `цвет = чёрный`, `память = 128GB`,
+`omarket_category_id = 1`.
+
 `omarket_attributes` необязателен, но `omarket_category_id` и габариты нужны
 для импорта. Action `Отправить выбранные каналы в маркетплейс` использует
 endpoint `/api/mia/v1/product/import/create-or-update/`, поэтому отсутствующие
