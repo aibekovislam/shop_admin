@@ -145,14 +145,25 @@ class ProductVariantAdminForm(forms.ModelForm):
         queryset=Product.objects.all(),
         required=False,
         label="Существующий продукт",
-        help_text="Выберите, только если добавляете новый SKU к уже созданной карточке.",
+        help_text="Если выбрали существующий продукт, название/категорию/описание ниже можно оставить пустыми.",
     )
-    product_name = forms.CharField(label="Название товара", required=False, max_length=255)
-    product_category = forms.CharField(label="Категория", required=False, max_length=255)
+    product_name = forms.CharField(
+        label="Название нового товара",
+        required=False,
+        max_length=255,
+        help_text="Заполняйте для новой карточки или если хотите переименовать выбранный продукт.",
+    )
+    product_category = forms.CharField(
+        label="Категория товара",
+        required=False,
+        max_length=255,
+        help_text="Для выбранного существующего продукта пустое поле оставит старую категорию.",
+    )
     product_description = forms.CharField(
-        label="Описание",
+        label="Описание товара",
         required=False,
         widget=forms.Textarea(attrs={"rows": 5}),
+        help_text="Для выбранного существующего продукта пустое поле оставит старое описание.",
     )
 
     class Meta:
@@ -200,9 +211,16 @@ class ProductVariantAdminForm(forms.ModelForm):
             product_name = self.cleaned_data.get("product_name")
             if product_name:
                 product.name = product_name
-                product.category = self.cleaned_data.get("product_category", "")
-                product.description = self.cleaned_data.get("product_description", "")
-                product.save(update_fields=["name", "category", "description", "updated_at"])
+                update_fields = ["name", "updated_at"]
+                product_category = self.cleaned_data.get("product_category")
+                product_description = self.cleaned_data.get("product_description")
+                if product_category:
+                    product.category = product_category
+                    update_fields.append("category")
+                if product_description:
+                    product.description = product_description
+                    update_fields.append("description")
+                product.save(update_fields=update_fields)
 
         instance.product = product
         if commit:
@@ -235,10 +253,13 @@ class ProductVariantAdmin(admin.ModelAdmin):
         ("SKU и характеристики", {
             "fields": ("sku", "attributes", "is_active", "created_at"),
         }),
-        ("Превью", {
-            "fields": ("first_image_preview",),
-        }),
     )
+
+    def get_fieldsets(self, request, obj=None):
+        fieldsets = list(super().get_fieldsets(request, obj))
+        if obj:
+            fieldsets.append(("Превью", {"fields": ("first_image_preview",)}))
+        return fieldsets
 
     def get_queryset(self, request):
         return (
