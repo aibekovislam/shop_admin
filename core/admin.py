@@ -198,10 +198,8 @@ class ProductVariantAdminForm(forms.ModelForm):
         if not product and not product_name:
             raise ValidationError("Укажите название товара или выберите существующий продукт.")
 
-        final_description = product_description
-        if not final_description and product:
-            final_description = product.description
-        if len(final_description or "") < 50:
+        should_validate_description = not product or bool(product_description)
+        if should_validate_description and len(product_description or "") < 50:
             self.add_error("product_description", "Описание товара должно быть минимум 50 символов.")
         if "" in attributes:
             self.add_error("attributes", "У каждой характеристики должен быть заполнен ключ.")
