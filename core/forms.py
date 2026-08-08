@@ -1,7 +1,6 @@
 import json
 
 from django import forms
-from django.core.exceptions import ValidationError
 
 
 class KeyValueJSONWidget(forms.Widget):
@@ -24,8 +23,6 @@ class KeyValueJSONWidget(forms.Widget):
             value = value.strip()
             if not key and not value:
                 continue
-            if not key:
-                raise ValidationError("У характеристики должен быть заполнен ключ.")
             result[key] = value
 
         return result

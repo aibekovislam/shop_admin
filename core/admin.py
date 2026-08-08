@@ -194,6 +194,7 @@ class ProductVariantAdminForm(forms.ModelForm):
         product = cleaned_data.get("product")
         product_name = cleaned_data.get("product_name")
         product_description = cleaned_data.get("product_description")
+        attributes = cleaned_data.get("attributes") or {}
         if not product and not product_name:
             raise ValidationError("Укажите название товара или выберите существующий продукт.")
 
@@ -202,6 +203,8 @@ class ProductVariantAdminForm(forms.ModelForm):
             final_description = product.description
         if len(final_description or "") < 50:
             self.add_error("product_description", "Описание товара должно быть минимум 50 символов.")
+        if "" in attributes:
+            self.add_error("attributes", "У каждой характеристики должен быть заполнен ключ.")
 
         return cleaned_data
 
