@@ -400,7 +400,6 @@ class ChannelPriceAdmin(ShopScopedAdminMixin, admin.ModelAdmin):
     list_display = (
         "product_name",
         "variant_sku",
-        "variant_attributes",
         "shop",
         "channel",
         "channel_adapter",
@@ -445,12 +444,6 @@ class ChannelPriceAdmin(ShopScopedAdminMixin, admin.ModelAdmin):
 
     variant_sku.short_description = "SKU"
     variant_sku.admin_order_field = "variant__sku"
-
-    def variant_attributes(self, obj):
-        attrs = obj.variant.attributes or {}
-        return ", ".join(f"{key}: {value}" for key, value in attrs.items()) or "-"
-
-    variant_attributes.short_description = "Характеристики"
 
     def channel_adapter(self, obj):
         return obj.channel.adapter_key or "-"
