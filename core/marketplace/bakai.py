@@ -28,10 +28,10 @@ class BakaiMarketAdapter(MarketplaceAdapter):
         if errors:
             raise ValidationError(errors)
 
-    def build_payload(self):
+    def build_payload(self, channel_price_ids=None):
         self.validate_channel()
 
-        prices = list(
+        prices = (
             ChannelPrice.objects.filter(
                 shop=self.shop,
                 channel=self.channel,
@@ -39,8 +39,11 @@ class BakaiMarketAdapter(MarketplaceAdapter):
                 price__gte=Decimal("0.01"),
             )
             .select_related("variant__product")
-            .prefetch_related("variant__images")[:1000]
+            .prefetch_related("variant__images")
         )
+        if channel_price_ids is not None:
+            prices = prices.filter(id__in=channel_price_ids)
+        prices = list(prices[:1000])
 
         stock_by_variant = {
             stock.variant_id: stock
@@ -132,8 +135,8 @@ class BakaiMarketAdapter(MarketplaceAdapter):
             errors.append("фото должны быть прямыми ссылками .jpg, .png или .webp")
         return errors
 
-    def push_products(self):
-        payload = self.build_payload()
+    def push_products(self, channel_price_ids=None):
+        payload = self.build_payload(channel_price_ids=channel_price_ids)
         request = Request(
             self.channel.api_url,
             data=json.dumps(payload).encode("utf-8"),
@@ -159,12 +162,15 @@ class BakaiMarketAdapter(MarketplaceAdapter):
         if status_code not in (200, 201, 202):
             raise Exception(f"Bakai Market error {status_code}: {response_body}")
 
-        ChannelPrice.objects.filter(
+        synced_prices = ChannelPrice.objects.filter(
             shop=self.shop,
             channel=self.channel,
             variant__is_active=True,
             price__gte=Decimal("0.01"),
-        ).update(last_synced_at=timezone.now(), last_sync_error="")
+        )
+        if channel_price_ids is not None:
+            synced_prices = synced_prices.filter(id__in=channel_price_ids)
+        synced_prices.update(last_synced_at=timezone.now(), last_sync_error="")
 
         if not response_body:
             return {"status": "ok", "sent": len(payload["products"])}

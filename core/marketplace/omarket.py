@@ -26,7 +26,7 @@ class OMarketAdapter(MarketplaceAdapter):
         if errors:
             raise ValidationError(errors)
 
-    def build_payload(self):
+    def build_payload(self, channel_price_ids=None):
         self.validate_channel()
 
         prices = (
@@ -39,6 +39,8 @@ class OMarketAdapter(MarketplaceAdapter):
             .select_related("variant__product")
             .prefetch_related("variant__images")
         )
+        if channel_price_ids is not None:
+            prices = prices.filter(id__in=channel_price_ids)
         prices = list(prices[:100])
 
         stock_by_variant = {
@@ -137,16 +139,19 @@ class OMarketAdapter(MarketplaceAdapter):
             errors.append("omarket_attributes должен быть списком")
         return errors
 
-    def push_products(self):
-        payload = self.build_payload()
+    def push_products(self, channel_price_ids=None):
+        payload = self.build_payload(channel_price_ids=channel_price_ids)
         response = self.send_json_request("POST", self.import_url(), payload)
 
-        ChannelPrice.objects.filter(
+        synced_prices = ChannelPrice.objects.filter(
             shop=self.shop,
             channel=self.channel,
             variant__is_active=True,
             price__gte=Decimal("0.01"),
-        ).update(last_synced_at=timezone.now(), last_sync_error="")
+        )
+        if channel_price_ids is not None:
+            synced_prices = synced_prices.filter(id__in=channel_price_ids)
+        synced_prices.update(last_synced_at=timezone.now(), last_sync_error="")
 
         return response or {"status": "ok", "sent": len(payload["products"])}
 

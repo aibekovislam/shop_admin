@@ -451,7 +451,7 @@ class ChannelPriceAdmin(ShopScopedAdminMixin, admin.ModelAdmin):
                 return stock
         return None
 
-    @admin.action(description="Отправить весь канал выбранных цен в маркетплейс")
+    @admin.action(description="Отправить выбранные товары в маркетплейс")
     def sync_selected_channels_to_marketplace(self, request, queryset):
         channels = Channel.objects.filter(
             id__in=queryset.values_list("channel_id", flat=True),
@@ -465,8 +465,9 @@ class ChannelPriceAdmin(ShopScopedAdminMixin, admin.ModelAdmin):
             return
 
         for channel in channels:
+            selected_price_ids = list(queryset.filter(channel=channel).values_list("id", flat=True))
             try:
-                result = get_marketplace_adapter(channel).push_products()
+                result = get_marketplace_adapter(channel).push_products(channel_price_ids=selected_price_ids)
             except ValidationError as exc:
                 queryset.filter(channel=channel).update(last_sync_error=str(exc))
                 self.message_user(request, f"{channel}: {exc}", level=messages.ERROR)
