@@ -398,21 +398,87 @@ class ChannelPriceAdmin(ShopScopedAdminMixin, admin.ModelAdmin):
     """Цена продажи по каждому каналу отдельно."""
 
     list_display = (
-        "variant",
+        "product_name",
+        "variant_sku",
+        "variant_attributes",
         "shop",
         "channel",
+        "channel_adapter",
         "price",
+        "stock_quantity",
+        "stock_state",
         "updated_at",
         "last_synced_at",
         "last_sync_error",
     )
     list_editable = ("price",)
-    list_filter = ("shop", "channel")
-    search_fields = ("variant__sku", "variant__product__name")
+    list_filter = (
+        "shop",
+        "channel",
+        "channel__adapter_key",
+        "variant__is_active",
+        "variant__product__category",
+        "last_synced_at",
+    )
+    search_fields = ("variant__sku", "variant__product__name", "variant__product__category", "channel__name")
+    ordering = ("-updated_at", "-id")
+    date_hierarchy = "updated_at"
     list_per_page = 1000
     actions = ["sync_selected_channels_to_marketplace"]
 
-    @admin.action(description="Отправить выбранные каналы в маркетплейс")
+    def get_queryset(self, request):
+        return (
+            super()
+            .get_queryset(request)
+            .select_related("variant__product", "shop", "channel")
+            .prefetch_related("variant__stocks")
+        )
+
+    def product_name(self, obj):
+        return obj.variant.product.name
+
+    product_name.short_description = "Товар"
+    product_name.admin_order_field = "variant__product__name"
+
+    def variant_sku(self, obj):
+        return obj.variant.sku
+
+    variant_sku.short_description = "SKU"
+    variant_sku.admin_order_field = "variant__sku"
+
+    def variant_attributes(self, obj):
+        attrs = obj.variant.attributes or {}
+        return ", ".join(f"{key}: {value}" for key, value in attrs.items()) or "-"
+
+    variant_attributes.short_description = "Характеристики"
+
+    def channel_adapter(self, obj):
+        return obj.channel.adapter_key or "-"
+
+    channel_adapter.short_description = "Adapter"
+    channel_adapter.admin_order_field = "channel__adapter_key"
+
+    def stock_quantity(self, obj):
+        stock = self._get_stock_for_price(obj)
+        return stock.marketplace_quantity if stock else 0
+
+    stock_quantity.short_description = "Кол-во в маркет"
+
+    def stock_state(self, obj):
+        stock = self._get_stock_for_price(obj)
+        if not stock:
+            return "нет Stock"
+        return "в наличии" if stock.in_stock else "выкл."
+
+    stock_state.short_description = "Наличие"
+
+    def _get_stock_for_price(self, obj):
+        for stock in obj.variant.stocks.all():
+            if stock.shop_id == obj.shop_id:
+                return stock
+        return None
+
+    @admin.action(description="Отправить весь канал выбранных цен в маркетплейс")
     def sync_selected_channels_to_marketplace(self, request, queryset):
         channels = Channel.objects.filter(
             id__in=queryset.values_list("channel_id", flat=True),
