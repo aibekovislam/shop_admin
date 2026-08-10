@@ -403,9 +403,6 @@ class ChannelPriceAdmin(ShopScopedAdminMixin, admin.ModelAdmin):
         "channel",
         "price",
         "stock_quantity",
-        "updated_at",
-        "last_synced_at",
-        "last_sync_error",
     )
     list_editable = ("price",)
     list_filter = (
