@@ -400,12 +400,9 @@ class ChannelPriceAdmin(ShopScopedAdminMixin, admin.ModelAdmin):
     list_display = (
         "product_name",
         "variant_sku",
-        "shop",
         "channel",
-        "channel_adapter",
         "price",
         "stock_quantity",
-        "stock_state",
         "updated_at",
         "last_synced_at",
         "last_sync_error",
@@ -445,25 +442,11 @@ class ChannelPriceAdmin(ShopScopedAdminMixin, admin.ModelAdmin):
     variant_sku.short_description = "SKU"
     variant_sku.admin_order_field = "variant__sku"
 
-    def channel_adapter(self, obj):
-        return obj.channel.adapter_key or "-"
-
-    channel_adapter.short_description = "Adapter"
-    channel_adapter.admin_order_field = "channel__adapter_key"
-
     def stock_quantity(self, obj):
         stock = self._get_stock_for_price(obj)
         return stock.marketplace_quantity if stock else 0
 
     stock_quantity.short_description = "Кол-во в маркет"
-
-    def stock_state(self, obj):
-        stock = self._get_stock_for_price(obj)
-        if not stock:
-            return "нет Stock"
-        return "в наличии" if stock.in_stock else "выкл."
-
-    stock_state.short_description = "Наличие"
 
     def _get_stock_for_price(self, obj):
         for stock in obj.variant.stocks.all():
