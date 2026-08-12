@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.contrib import messages
+from django.contrib.admin.widgets import FilteredSelectMultiple
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from django.core.exceptions import ValidationError
 from django import forms
@@ -264,6 +265,13 @@ class ProductVariantAdminForm(forms.ModelForm):
         required=False,
         help_text="После сохранения отправит товары по заполненным ценам каналов этого SKU.",
     )
+    similar_variants = forms.ModelMultipleChoiceField(
+        label="Похожие товары",
+        queryset=ProductVariant.objects.none(),
+        required=False,
+        widget=FilteredSelectMultiple("похожие товары", is_stacked=False),
+        help_text="Выберите варианты, которые должны группироваться вместе на маркетплейсе.",
+    )
 
     class Meta:
         model = ProductVariant
@@ -276,7 +284,7 @@ class ProductVariantAdminForm(forms.ModelForm):
             "product_description",
             "sku",
             "attributes",
-            "similar_products_sku",
+            "similar_variants",
             "is_active",
             "sync_after_save",
         )
@@ -291,6 +299,10 @@ class ProductVariantAdminForm(forms.ModelForm):
         self.fields["product_brand_category"].widget = DatalistTextInput(
             choices=model_name_values(BrandCategory)
         )
+        similar_queryset = ProductVariant.objects.select_related("product").order_by("product__name", "sku")
+        if self.instance and self.instance.pk:
+            similar_queryset = similar_queryset.exclude(pk=self.instance.pk)
+        self.fields["similar_variants"].queryset = similar_queryset
         if self.instance and self.instance.pk and self.instance.product_id:
             product = self.instance.product
             self.fields["product_name"].initial = product.name
@@ -298,6 +310,9 @@ class ProductVariantAdminForm(forms.ModelForm):
             self.fields["product_brand_name"].initial = product.brand_name
             self.fields["product_brand_category"].initial = product.brand_category
             self.fields["product_description"].initial = product.description
+            self.fields["similar_variants"].initial = ProductVariant.objects.filter(
+                sku__in=self.instance.similar_products_sku_list,
+            )
 
     def clean(self):
         cleaned_data = super().clean()
@@ -354,6 +369,9 @@ class ProductVariantAdminForm(forms.ModelForm):
                 product.save(update_fields=update_fields)
 
         instance.product = product
+        instance.similar_products_sku = "\n".join(
+            variant.sku for variant in self.cleaned_data.get("similar_variants", [])
+        )
         if commit:
             instance.save()
             self.save_m2m()
@@ -404,7 +422,7 @@ class ProductVariantAdmin(admin.ModelAdmin):
             "fields": (
                 "sku",
                 "attributes",
-                "similar_products_sku",
+                "similar_variants",
                 "is_active",
                 "sync_after_save",
                 "created_at",
