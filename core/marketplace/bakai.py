@@ -62,8 +62,8 @@ class BakaiMarketAdapter(MarketplaceAdapter):
             attrs = variant.attributes or {}
             stock = stock_by_variant.get(variant.id)
             images = [f"{public_base_url}{image.image.url}" for image in variant.images.all()]
-            brand_name = self.get_brand_name(attrs)
-            attributes = self.build_attributes(attrs)
+            brand_name = self.get_brand_name(product_model, attrs)
+            attributes = self.build_attributes(product_model, attrs)
 
             product_errors = self.validate_product(product_model, variant, images, brand_name)
             if product_errors:
@@ -82,6 +82,10 @@ class BakaiMarketAdapter(MarketplaceAdapter):
                 "quantity": stock.marketplace_quantity if stock else 0,
                 "is_active": variant.is_active,
             }
+            if price.discount_amount:
+                item["discount_amount"] = float(price.discount_amount)
+            if variant.similar_products_sku_list:
+                item["similar_products_sku"] = variant.similar_products_sku_list
             if attributes:
                 item["attributes"] = attributes
 
@@ -94,15 +98,19 @@ class BakaiMarketAdapter(MarketplaceAdapter):
 
         return {"products": products}
 
-    def get_brand_name(self, attrs):
+    def get_brand_name(self, product, attrs):
+        if product.brand_name:
+            return product.brand_name
         for key in self.BRAND_KEYS:
             value = attrs.get(key)
             if value not in (None, ""):
                 return str(value)
         return ""
 
-    def build_attributes(self, attrs):
+    def build_attributes(self, product, attrs):
         attributes = []
+        if product.brand_category:
+            attributes.append({"name": "Категория бренда", "value": product.brand_category})
         for key, value in attrs.items():
             key = str(key).strip()
             if not key or value in (None, ""):
@@ -170,7 +178,11 @@ class BakaiMarketAdapter(MarketplaceAdapter):
         )
         if channel_price_ids is not None:
             synced_prices = synced_prices.filter(id__in=channel_price_ids)
-        synced_prices.update(last_synced_at=timezone.now(), last_sync_error="")
+        synced_prices.update(
+            sync_status=ChannelPrice.SyncStatus.SUCCESS,
+            last_synced_at=timezone.now(),
+            last_sync_error="",
+        )
 
         if not response_body:
             return {"status": "ok", "sent": len(payload["products"])}

@@ -92,7 +92,9 @@ class OMarketAdapter(MarketplaceAdapter):
             optional_fields = {
                 "location_id": attrs.get("omarket_location_id"),
                 "discount_type": attrs.get("omarket_discount_type"),
-                "discount_value": attrs.get("omarket_discount_value"),
+                "discount_value": attrs.get("omarket_discount_value") or (
+                    float(price.discount_amount) if price.discount_amount else None
+                ),
                 "attributes": attrs.get("omarket_attributes"),
             }
             for key, value in optional_fields.items():
@@ -151,7 +153,11 @@ class OMarketAdapter(MarketplaceAdapter):
         )
         if channel_price_ids is not None:
             synced_prices = synced_prices.filter(id__in=channel_price_ids)
-        synced_prices.update(last_synced_at=timezone.now(), last_sync_error="")
+        synced_prices.update(
+            sync_status=ChannelPrice.SyncStatus.SUCCESS,
+            last_synced_at=timezone.now(),
+            last_sync_error="",
+        )
 
         return response or {"status": "ok", "sent": len(payload["products"])}
 

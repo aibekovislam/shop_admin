@@ -1,4 +1,5 @@
 import secrets
+import string
 
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
@@ -51,6 +52,12 @@ class Product(models.Model):
 
     name = models.CharField(max_length=255)
     category = models.CharField(max_length=255, blank=True)
+    brand_name = models.CharField(max_length=255, blank=True)
+    brand_category = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Категория внутри бренда: iPhone, MacBook, AirPods и т.п.",
+    )
     description = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -71,11 +78,20 @@ class ProductVariant(models.Model):
     """
 
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="variants")
-    sku = models.CharField(max_length=100, unique=True, help_text="Уникальный артикул варианта")
+    sku = models.CharField(
+        max_length=100,
+        unique=True,
+        blank=True,
+        help_text="Уникальный артикул варианта. Если оставить пустым, сгенерируется SKU из 15 символов.",
+    )
     attributes = models.JSONField(
         default=dict,
         blank=True,
         help_text='Например: {"цвет": "чёрный", "память": "128GB"}',
+    )
+    similar_products_sku = models.TextField(
+        blank=True,
+        help_text="SKU похожих товаров для группировки. Можно через запятую или каждый SKU с новой строки.",
     )
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -86,6 +102,24 @@ class ProductVariant(models.Model):
     def __str__(self):
         attrs = ", ".join(f"{k}: {v}" for k, v in self.attributes.items())
         return f"{self.product.name} ({attrs})" if attrs else f"{self.product.name} [{self.sku}]"
+
+    def save(self, *args, **kwargs):
+        if not self.sku:
+            self.sku = self.generate_unique_sku()
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def generate_unique_sku(cls):
+        alphabet = string.ascii_uppercase + string.digits
+        while True:
+            sku = "".join(secrets.choice(alphabet) for _ in range(15))
+            if not cls.objects.filter(sku=sku).exists():
+                return sku
+
+    @property
+    def similar_products_sku_list(self):
+        raw_skus = self.similar_products_sku.replace(",", "\n").splitlines()
+        return [sku.strip() for sku in raw_skus if sku.strip()]
 
 
 class ProductImage(models.Model):
@@ -199,11 +233,29 @@ class ChannelPrice(models.Model):
     товара в одном и том же магазине.
     """
 
+    class SyncStatus(models.TextChoices):
+        PENDING = "pending", "Pending"
+        SUCCESS = "success", "Success"
+        WARNING = "warning", "Warning"
+        ERROR = "error", "Error"
+
     variant = models.ForeignKey(ProductVariant, on_delete=models.CASCADE, related_name="channel_prices")
     shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name="channel_prices")
     channel = models.ForeignKey(Channel, on_delete=models.CASCADE, related_name="channel_prices")
 
     price = models.DecimalField(max_digits=10, decimal_places=2)
+    discount_amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Сумма скидки для этого канала. Это не цена со скидкой, а размер скидки.",
+    )
+    sync_status = models.CharField(
+        max_length=20,
+        choices=SyncStatus.choices,
+        default=SyncStatus.PENDING,
+    )
 
     updated_at = models.DateTimeField(auto_now=True)
     last_synced_at = models.DateTimeField(null=True, blank=True)

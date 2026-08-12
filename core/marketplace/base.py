@@ -9,10 +9,10 @@ class MarketplaceAdapter(ABC):
 
 
     @abstractmethod
-    def build_payload(self):
+    def build_payload(self, channel_price_ids=None):
         pass
 
 
     @abstractmethod
-    def push_products(self):
+    def push_products(self, channel_price_ids=None):
         pass

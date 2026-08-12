@@ -93,6 +93,10 @@ class MMarketAdapter(MarketplaceAdapter):
                     }
                 ],
             }
+            if price.discount_amount:
+                product["discount"] = str(price.discount_amount)
+            if variant.similar_products_sku_list:
+                product["similar_products_sku"] = variant.similar_products_sku_list
 
             products.append(product)
 
@@ -118,8 +122,12 @@ class MMarketAdapter(MarketplaceAdapter):
 
         if product.category and not normalized_specs.get("Тип"):
             normalized_specs["Тип"] = product.category
+        if product.brand_name and not normalized_specs.get("Производители"):
+            normalized_specs["Производители"] = product.brand_name
         if product.name and not normalized_specs.get("Модель"):
             normalized_specs["Модель"] = product.name
+        if product.brand_category and not normalized_specs.get("Категория бренда"):
+            normalized_specs["Категория бренда"] = product.brand_category
 
         return normalized_specs
 
@@ -199,7 +207,11 @@ class MMarketAdapter(MarketplaceAdapter):
         )
         if channel_price_ids is not None:
             synced_prices = synced_prices.filter(id__in=channel_price_ids)
-        synced_prices.update(last_synced_at=timezone.now(), last_sync_error="")
+        synced_prices.update(
+            sync_status=ChannelPrice.SyncStatus.SUCCESS,
+            last_synced_at=timezone.now(),
+            last_sync_error="",
+        )
 
         if not response_body:
             return {"status": "ok", "sent": len(payload["products"])}

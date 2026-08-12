@@ -155,10 +155,16 @@ class CreateVariantView(ShopScopedAPIView):
 
         with transaction.atomic():
             product = Product.objects.create(
-                name=data["product_name"], category=data.get("category", "")
+                name=data["product_name"],
+                category=data.get("category", ""),
+                brand_name=data.get("brand_name", ""),
+                brand_category=data.get("brand_category", ""),
             )
             variant = ProductVariant.objects.create(
-                product=product, sku=data["sku"], attributes=data.get("attributes", {})
+                product=product,
+                sku=data.get("sku", ""),
+                attributes=data.get("attributes", {}),
+                similar_products_sku=data.get("similar_products_sku", ""),
             )
             Stock.objects.create(
                 variant=variant,

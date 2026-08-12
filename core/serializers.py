@@ -14,8 +14,18 @@ class ChannelPriceSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ChannelPrice
-        fields = ["id", "channel", "channel_name", "price", "updated_at", "last_synced_at", "last_sync_error"]
-        read_only_fields = ["updated_at", "last_synced_at", "last_sync_error"]
+        fields = [
+            "id",
+            "channel",
+            "channel_name",
+            "price",
+            "discount_amount",
+            "sync_status",
+            "updated_at",
+            "last_synced_at",
+            "last_sync_error",
+        ]
+        read_only_fields = ["sync_status", "updated_at", "last_synced_at", "last_sync_error"]
 
 
 class VariantListSerializer(serializers.ModelSerializer):
@@ -40,6 +50,7 @@ class VariantListSerializer(serializers.ModelSerializer):
             "sku",
             "product_name",
             "attributes",
+            "similar_products_sku",
             "images",
             "wholesale_price",
             "quantity",
@@ -97,13 +108,16 @@ class CreateVariantSerializer(serializers.Serializer):
 
     product_name = serializers.CharField(max_length=255)
     category = serializers.CharField(max_length=255, required=False, allow_blank=True)
-    sku = serializers.CharField(max_length=100)
+    brand_name = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    brand_category = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    sku = serializers.CharField(max_length=100, required=False, allow_blank=True)
     attributes = serializers.DictField(required=False, default=dict)
+    similar_products_sku = serializers.CharField(required=False, allow_blank=True)
     wholesale_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
     quantity = serializers.IntegerField(min_value=0, required=False, default=0)
     in_stock = serializers.BooleanField(required=False, default=False)
 
     def validate_sku(self, value):
-        if ProductVariant.objects.filter(sku=value).exists():
+        if value and ProductVariant.objects.filter(sku=value).exists():
             raise serializers.ValidationError("SKU already exists.")
         return value

@@ -91,8 +91,8 @@ class ProductAdmin(admin.ModelAdmin):
     """
 
     form = ProductAdminForm
-    list_display = ("name", "category", "created_at")
-    search_fields = ("name", "category")
+    list_display = ("name", "category", "brand_name", "brand_category", "created_at")
+    search_fields = ("name", "category", "brand_name", "brand_category")
 
 
 class ProductImageInline(admin.TabularInline):
@@ -136,8 +136,8 @@ class ChannelPriceInline(ShopScopedAdminMixin, admin.TabularInline):
 
     model = ChannelPrice
     extra = 1
-    fields = ("shop", "channel", "price", "last_synced_at", "last_sync_error")
-    readonly_fields = ("last_synced_at", "last_sync_error")
+    fields = ("shop", "channel", "price", "discount_amount", "sync_status", "last_synced_at", "last_sync_error")
+    readonly_fields = ("sync_status", "last_synced_at", "last_sync_error")
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if not request.user.is_superuser and request.user.shop_id:
@@ -172,11 +172,28 @@ class ProductVariantAdminForm(forms.ModelForm):
         max_length=255,
         help_text="Для выбранного существующего продукта пустое поле оставит старую категорию.",
     )
+    product_brand_name = forms.CharField(
+        label="Бренд товара",
+        required=False,
+        max_length=255,
+        help_text="Например: Apple, Samsung, Xiaomi.",
+    )
+    product_brand_category = forms.CharField(
+        label="Категория бренда",
+        required=False,
+        max_length=255,
+        help_text="Например: iPhone, MacBook, AirPods.",
+    )
     product_description = forms.CharField(
         label="Описание товара",
         required=False,
         widget=forms.Textarea(attrs={"rows": 5}),
         help_text="Минимум 50 символов. Для выбранного существующего продукта пустое поле оставит старое описание.",
+    )
+    sync_after_save = forms.BooleanField(
+        label="Отправить в маркетплейсы после сохранения",
+        required=False,
+        help_text="После сохранения отправит товары по заполненным ценам каналов этого SKU.",
     )
 
     class Meta:
@@ -185,10 +202,14 @@ class ProductVariantAdminForm(forms.ModelForm):
             "product",
             "product_name",
             "product_category",
+            "product_brand_name",
+            "product_brand_category",
             "product_description",
             "sku",
             "attributes",
+            "similar_products_sku",
             "is_active",
+            "sync_after_save",
         )
         widgets = {
             "attributes": KeyValueJSONWidget,
@@ -200,6 +221,8 @@ class ProductVariantAdminForm(forms.ModelForm):
             product = self.instance.product
             self.fields["product_name"].initial = product.name
             self.fields["product_category"].initial = product.category
+            self.fields["product_brand_name"].initial = product.brand_name
+            self.fields["product_brand_category"].initial = product.brand_category
             self.fields["product_description"].initial = product.description
 
     def clean(self):
@@ -227,18 +250,30 @@ class ProductVariantAdminForm(forms.ModelForm):
             product = Product.objects.create(
                 name=self.cleaned_data["product_name"],
                 category=self.cleaned_data.get("product_category", ""),
+                brand_name=self.cleaned_data.get("product_brand_name", ""),
+                brand_category=self.cleaned_data.get("product_brand_category", ""),
                 description=self.cleaned_data.get("product_description", ""),
             )
         else:
             product_name = self.cleaned_data.get("product_name")
-            if product_name:
-                product.name = product_name
-                update_fields = ["name", "updated_at"]
-                product_category = self.cleaned_data.get("product_category")
-                product_description = self.cleaned_data.get("product_description")
+            product_brand_name = self.cleaned_data.get("product_brand_name")
+            product_brand_category = self.cleaned_data.get("product_brand_category")
+            product_category = self.cleaned_data.get("product_category")
+            product_description = self.cleaned_data.get("product_description")
+            if product_name or product_category or product_brand_name or product_brand_category or product_description:
+                update_fields = ["updated_at"]
+                if product_name:
+                    product.name = product_name
+                    update_fields.append("name")
                 if product_category:
                     product.category = product_category
                     update_fields.append("category")
+                if product_brand_name:
+                    product.brand_name = product_brand_name
+                    update_fields.append("brand_name")
+                if product_brand_category:
+                    product.brand_category = product_brand_category
+                    update_fields.append("brand_category")
                 if product_description:
                     product.description = product_description
                     update_fields.append("description")
@@ -260,6 +295,7 @@ class ProductVariantAdmin(admin.ModelAdmin):
         "product_category",
         "stock_summary",
         "channel_prices_summary",
+        "sync_status_summary",
         "is_active",
         "photo_count",
         "created_at",
@@ -280,14 +316,29 @@ class ProductVariantAdmin(admin.ModelAdmin):
     inlines = [ProductImageInline, StockInline, ChannelPriceInline]
     fieldsets = (
         ("Информация о товаре", {
-            "fields": ("product_id_display", "product", "product_name", "product_category", "product_description"),
+            "fields": (
+                "product_id_display",
+                "product",
+                "product_name",
+                "product_category",
+                "product_brand_name",
+                "product_brand_category",
+                "product_description",
+            ),
         }),
         ("SKU и характеристики", {
-            "fields": ("sku", "attributes", "is_active", "created_at"),
+            "fields": (
+                "sku",
+                "attributes",
+                "similar_products_sku",
+                "is_active",
+                "sync_after_save",
+                "created_at",
+            ),
             "description": (
                 "Для M-Market обязательны ключи характеристик: Тип, Производители, Модель, Цвет. "
                 "Можно писать цвет/модель/производитель маленькими буквами — при отправке в M-Market ключи нормализуются. "
-                "Для Bakai Market бренд берётся из ключей: Бренд, brand, Производитель, Производители."
+                "Бренд можно заполнить отдельным полем выше; для Bakai Market он уйдёт как brand_name."
             ),
         }),
     )
@@ -334,9 +385,19 @@ class ProductVariantAdmin(admin.ModelAdmin):
 
     def channel_prices_summary(self, obj):
         prices = obj.channel_prices.select_related("channel")
-        return ", ".join(f"{price.channel.name}: {price.price}" for price in prices) or "-"
+        return ", ".join(
+            f"{price.channel.name}: {price.price}"
+            + (f" (-{price.discount_amount})" if price.discount_amount else "")
+            for price in prices
+        ) or "-"
 
     channel_prices_summary.short_description = "Цены каналов"
+
+    def sync_status_summary(self, obj):
+        prices = obj.channel_prices.select_related("channel")
+        return ", ".join(f"{price.channel.name}: {price.get_sync_status_display()}" for price in prices) or "-"
+
+    sync_status_summary.short_description = "Статус синка"
 
     def first_image_preview(self, obj):
         if not obj or not obj.pk:
@@ -350,6 +411,43 @@ class ProductVariantAdmin(admin.ModelAdmin):
         )
 
     first_image_preview.short_description = "Превью"
+
+    def save_related(self, request, form, formsets, change):
+        super().save_related(request, form, formsets, change)
+        if form.cleaned_data.get("sync_after_save"):
+            self.sync_variant_channel_prices(request, form.instance)
+
+    def sync_variant_channel_prices(self, request, variant):
+        prices = (
+            variant.channel_prices.select_related("channel")
+            .filter(channel__adapter_key__gt="")
+        )
+        if not prices.exists():
+            self.message_user(
+                request,
+                f"{variant.sku}: нет цен каналов с adapter_key для отправки.",
+                level=messages.WARNING,
+            )
+            return
+
+        for channel in Channel.objects.filter(id__in=prices.values_list("channel_id", flat=True)):
+            selected_price_ids = list(prices.filter(channel=channel).values_list("id", flat=True))
+            try:
+                result = get_marketplace_adapter(channel).push_products(channel_price_ids=selected_price_ids)
+            except ValidationError as exc:
+                prices.filter(channel=channel).update(
+                    sync_status=ChannelPrice.SyncStatus.ERROR,
+                    last_sync_error=str(exc),
+                )
+                self.message_user(request, f"{channel}: {exc}", level=messages.ERROR)
+            except Exception as exc:  # noqa: BLE001
+                prices.filter(channel=channel).update(
+                    sync_status=ChannelPrice.SyncStatus.ERROR,
+                    last_sync_error=str(exc),
+                )
+                self.message_user(request, f"{channel}: ошибка маркетплейса: {exc}", level=messages.ERROR)
+            else:
+                self.message_user(request, f"{channel}: выгрузка отправлена. Ответ: {result}")
 
 
 @admin.register(Channel)
@@ -402,13 +500,16 @@ class ChannelPriceAdmin(ShopScopedAdminMixin, admin.ModelAdmin):
         "variant_sku",
         "channel",
         "price",
+        "discount_amount",
         "stock_quantity",
+        "sync_status",
     )
-    list_editable = ("price",)
+    list_editable = ("price", "discount_amount")
     list_filter = (
         "shop",
         "channel",
         "channel__adapter_key",
+        "sync_status",
         "variant__is_active",
         "variant__product__category",
         "last_synced_at",
@@ -453,6 +554,18 @@ class ChannelPriceAdmin(ShopScopedAdminMixin, admin.ModelAdmin):
 
     @admin.action(description="Отправить выбранные товары в маркетплейс")
     def sync_selected_channels_to_marketplace(self, request, queryset):
+        skipped_prices = queryset.filter(channel__adapter_key="")
+        if skipped_prices.exists():
+            skipped_prices.update(
+                sync_status=ChannelPrice.SyncStatus.WARNING,
+                last_sync_error="У канала не заполнен adapter_key.",
+            )
+            self.message_user(
+                request,
+                "Часть выбранных цен пропущена: у канала не заполнен adapter_key.",
+                level=messages.WARNING,
+            )
+
         channels = Channel.objects.filter(
             id__in=queryset.values_list("channel_id", flat=True),
         ).exclude(adapter_key="")
@@ -469,11 +582,17 @@ class ChannelPriceAdmin(ShopScopedAdminMixin, admin.ModelAdmin):
             try:
                 result = get_marketplace_adapter(channel).push_products(channel_price_ids=selected_price_ids)
             except ValidationError as exc:
-                queryset.filter(channel=channel).update(last_sync_error=str(exc))
+                queryset.filter(channel=channel).update(
+                    sync_status=ChannelPrice.SyncStatus.ERROR,
+                    last_sync_error=str(exc),
+                )
                 self.message_user(request, f"{channel}: {exc}", level=messages.ERROR)
             except Exception as exc:  # noqa: BLE001
-                queryset.filter(channel=channel).update(last_sync_error=str(exc))
-                self.message_user(request, f"{channel}: ошибка M-Market: {exc}", level=messages.ERROR)
+                queryset.filter(channel=channel).update(
+                    sync_status=ChannelPrice.SyncStatus.ERROR,
+                    last_sync_error=str(exc),
+                )
+                self.message_user(request, f"{channel}: ошибка маркетплейса: {exc}", level=messages.ERROR)
             else:
                 self.message_user(request, f"{channel}: выгрузка отправлена. Ответ: {result}")
 
