@@ -36,6 +36,10 @@ def model_name_values(model):
     return model.objects.order_by("name").values_list("name", flat=True).distinct()
 
 
+class HexColorInput(forms.TextInput):
+    input_type = "color"
+
+
 class DatalistTextInput(forms.TextInput):
     def __init__(self, choices=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -137,6 +141,23 @@ class BrandCategoryAdmin(admin.ModelAdmin):
 
 @admin.register(ProductColor)
 class ProductColorAdmin(admin.ModelAdmin):
+    class ProductColorAdminForm(forms.ModelForm):
+        class Meta:
+            model = ProductColor
+            fields = "__all__"
+            widgets = {
+                "hash_code": HexColorInput,
+            }
+
+        def clean_hash_code(self):
+            value = (self.cleaned_data.get("hash_code") or "#000000").strip()
+            if not value.startswith("#"):
+                value = f"#{value}"
+            if len(value) != 7:
+                raise ValidationError("HEX-код должен быть в формате #000000.")
+            return value.upper()
+
+    form = ProductColorAdminForm
     list_display = ("name", "hash_code", "color_preview", "created_at")
     search_fields = ("name", "hash_code")
 
@@ -289,6 +310,18 @@ class ProductVariantAdminForm(forms.ModelForm):
         widget=forms.Textarea(attrs={"rows": 5}),
         help_text="Минимум 50 символов. Для выбранного существующего продукта пустое поле оставит старое описание.",
     )
+    color_name = forms.CharField(
+        label="Новый цвет",
+        required=False,
+        max_length=120,
+        help_text="Если нужного цвета нет в списке, напишите название здесь.",
+    )
+    color_hash_code = forms.CharField(
+        label="HEX-код цвета",
+        required=False,
+        widget=HexColorInput,
+        help_text="Нужен только для нового цвета или обновления цвета из справочника.",
+    )
     sync_after_save = forms.BooleanField(
         label="Отправить в маркетплейсы после сохранения",
         required=False,
@@ -313,6 +346,8 @@ class ProductVariantAdminForm(forms.ModelForm):
             "product_description",
             "sku",
             "color",
+            "color_name",
+            "color_hash_code",
             "memory",
             "size",
             "attributes",
@@ -331,6 +366,10 @@ class ProductVariantAdminForm(forms.ModelForm):
         self.fields["product_brand_category"].widget = DatalistTextInput(
             choices=model_name_values(BrandCategory)
         )
+        self.fields["color"].label = "Цвет из справочника"
+        self.fields["color"].help_text = "Выберите существующий цвет или заполните новый цвет ниже."
+        self.fields["color_name"].widget = DatalistTextInput(choices=model_name_values(ProductColor))
+        self.fields["color_hash_code"].initial = "#000000"
         similar_queryset = ProductVariant.objects.select_related("product").order_by("product__name", "sku")
         if self.instance and self.instance.pk:
             similar_queryset = similar_queryset.exclude(pk=self.instance.pk)
@@ -342,6 +381,9 @@ class ProductVariantAdminForm(forms.ModelForm):
             self.fields["product_brand_name"].initial = product.brand_name
             self.fields["product_brand_category"].initial = product.brand_category
             self.fields["product_description"].initial = product.description
+            if self.instance.color_id:
+                self.fields["color_name"].initial = self.instance.color.name
+                self.fields["color_hash_code"].initial = self.instance.color.hash_code
             self.fields["similar_variants"].initial = ProductVariant.objects.filter(
                 sku__in=self.instance.similar_products_sku_list,
             )
@@ -352,6 +394,7 @@ class ProductVariantAdminForm(forms.ModelForm):
         product_name = cleaned_data.get("product_name")
         product_description = cleaned_data.get("product_description")
         attributes = cleaned_data.get("attributes") or {}
+        color_hash_code = (cleaned_data.get("color_hash_code") or "").strip()
         if not product and not product_name:
             raise ValidationError("Укажите название товара или выберите существующий продукт.")
 
@@ -360,6 +403,12 @@ class ProductVariantAdminForm(forms.ModelForm):
             self.add_error("product_description", "Описание товара должно быть минимум 50 символов.")
         if "" in attributes:
             self.add_error("attributes", "У каждой характеристики должен быть заполнен ключ.")
+        if color_hash_code:
+            if not color_hash_code.startswith("#"):
+                color_hash_code = f"#{color_hash_code}"
+                cleaned_data["color_hash_code"] = color_hash_code
+            if len(color_hash_code) != 7:
+                self.add_error("color_hash_code", "HEX-код цвета должен быть в формате #000000.")
 
         return cleaned_data
 
@@ -401,6 +450,7 @@ class ProductVariantAdminForm(forms.ModelForm):
                 product.save(update_fields=update_fields)
 
         instance.product = product
+        instance.color = self.resolve_color(instance)
         instance.similar_products_sku = "\n".join(
             variant.sku for variant in self.cleaned_data.get("similar_variants", [])
         )
@@ -408,6 +458,24 @@ class ProductVariantAdminForm(forms.ModelForm):
             instance.save()
             self.save_m2m()
         return instance
+
+    def resolve_color(self, instance):
+        color_name = (self.cleaned_data.get("color_name") or "").strip()
+        color_hash_code = (self.cleaned_data.get("color_hash_code") or "#000000").strip().upper()
+        if color_hash_code and not color_hash_code.startswith("#"):
+            color_hash_code = f"#{color_hash_code}"
+
+        if color_name:
+            color, created = ProductColor.objects.get_or_create(
+                name=color_name,
+                defaults={"hash_code": color_hash_code or "#000000"},
+            )
+            should_update_hash = not created and color_hash_code and color_hash_code != "#000000"
+            if should_update_hash and color.hash_code != color_hash_code:
+                color.hash_code = color_hash_code
+                color.save(update_fields=["hash_code"])
+            return color
+        return self.cleaned_data.get("color") or instance.color
 
 
 @admin.register(ProductVariant)
@@ -460,6 +528,8 @@ class ProductVariantAdmin(admin.ModelAdmin):
             "fields": (
                 "sku",
                 "color",
+                "color_name",
+                "color_hash_code",
                 "memory",
                 "size",
                 "attributes",
