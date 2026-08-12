@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib import messages
-from django.contrib.admin.widgets import FilteredSelectMultiple
+from django.contrib.admin.widgets import FilteredSelectMultiple, RelatedFieldWidgetWrapper
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from django.core.exceptions import ValidationError
 from django import forms
@@ -186,6 +186,9 @@ class ProductAdminForm(forms.ModelForm):
     class Meta:
         model = Product
         fields = "__all__"
+        widgets = {
+            "memory_price": KeyValueJSONWidget,
+        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -213,6 +216,18 @@ class ProductAdmin(admin.ModelAdmin):
     list_display = ("name", "category", "brand_name", "brand_category", "created_at")
     search_fields = ("name", "category", "brand_name", "brand_category")
     readonly_fields = ("category_ref", "brand_ref", "brand_category_ref")
+    filter_horizontal = ("colors", "memories", "sizes")
+    fieldsets = (
+        ("Название и описание", {
+            "fields": ("name", "category", "brand_name", "brand_category", "description"),
+        }),
+        ("Характеристики и опции", {
+            "fields": ("memory_price", "colors", "memories", "sizes"),
+        }),
+        ("Справочники", {
+            "fields": ("category_ref", "brand_ref", "brand_category_ref"),
+        }),
+    )
 
 
 class ProductImageInline(admin.TabularInline):
@@ -310,17 +325,32 @@ class ProductVariantAdminForm(forms.ModelForm):
         widget=forms.Textarea(attrs={"rows": 5}),
         help_text="Минимум 50 символов. Для выбранного существующего продукта пустое поле оставит старое описание.",
     )
-    color_name = forms.CharField(
-        label="Новый цвет",
+    product_memory_price = forms.JSONField(
+        label="Цена памяти",
         required=False,
-        max_length=120,
-        help_text="Если нужного цвета нет в списке, напишите название здесь.",
+        widget=KeyValueJSONWidget,
+        help_text="Как в старой админке: ключ — память, значение — цена.",
     )
-    color_hash_code = forms.CharField(
-        label="HEX-код цвета",
+    product_colors = forms.ModelMultipleChoiceField(
+        label="Цвет",
+        queryset=ProductColor.objects.none(),
         required=False,
-        widget=HexColorInput,
-        help_text="Нужен только для нового цвета или обновления цвета из справочника.",
+        widget=FilteredSelectMultiple("Цвет", is_stacked=False),
+        help_text="Выберите цвета товара. Первый выбранный цвет уйдёт в M-Market для этого SKU.",
+    )
+    product_memories = forms.ModelMultipleChoiceField(
+        label="Память",
+        queryset=Memory.objects.none(),
+        required=False,
+        widget=FilteredSelectMultiple("Память", is_stacked=False),
+        help_text="Выберите варианты памяти. Первая выбранная память уйдёт в M-Market для этого SKU.",
+    )
+    product_sizes = forms.ModelMultipleChoiceField(
+        label="Размер",
+        queryset=ProductSize.objects.none(),
+        required=False,
+        widget=FilteredSelectMultiple("Размер", is_stacked=False),
+        help_text="Выберите размеры товара, если они нужны.",
     )
     sync_after_save = forms.BooleanField(
         label="Отправить в маркетплейсы после сохранения",
@@ -344,12 +374,11 @@ class ProductVariantAdminForm(forms.ModelForm):
             "product_brand_name",
             "product_brand_category",
             "product_description",
+            "product_memory_price",
+            "product_colors",
+            "product_memories",
+            "product_sizes",
             "sku",
-            "color",
-            "color_name",
-            "color_hash_code",
-            "memory",
-            "size",
             "attributes",
             "similar_variants",
             "is_active",
@@ -366,10 +395,10 @@ class ProductVariantAdminForm(forms.ModelForm):
         self.fields["product_brand_category"].widget = DatalistTextInput(
             choices=model_name_values(BrandCategory)
         )
-        self.fields["color"].label = "Цвет из справочника"
-        self.fields["color"].help_text = "Выберите существующий цвет или заполните новый цвет ниже."
-        self.fields["color_name"].widget = DatalistTextInput(choices=model_name_values(ProductColor))
-        self.fields["color_hash_code"].initial = "#000000"
+        self.fields["product_colors"].queryset = ProductColor.objects.order_by("name")
+        self.fields["product_memories"].queryset = Memory.objects.order_by("volume")
+        self.fields["product_sizes"].queryset = ProductSize.objects.order_by("name")
+        self.wrap_product_option_widgets()
         similar_queryset = ProductVariant.objects.select_related("product").order_by("product__name", "sku")
         if self.instance and self.instance.pk:
             similar_queryset = similar_queryset.exclude(pk=self.instance.pk)
@@ -381,11 +410,29 @@ class ProductVariantAdminForm(forms.ModelForm):
             self.fields["product_brand_name"].initial = product.brand_name
             self.fields["product_brand_category"].initial = product.brand_category
             self.fields["product_description"].initial = product.description
-            if self.instance.color_id:
-                self.fields["color_name"].initial = self.instance.color.name
-                self.fields["color_hash_code"].initial = self.instance.color.hash_code
+            self.fields["product_memory_price"].initial = product.memory_price or {}
+            self.fields["product_colors"].initial = product.colors.all()
+            self.fields["product_memories"].initial = product.memories.all()
+            self.fields["product_sizes"].initial = product.sizes.all()
             self.fields["similar_variants"].initial = ProductVariant.objects.filter(
                 sku__in=self.instance.similar_products_sku_list,
+            )
+
+    def wrap_product_option_widgets(self):
+        option_fields = {
+            "product_colors": "colors",
+            "product_memories": "memories",
+            "product_sizes": "sizes",
+        }
+        for form_field_name, model_field_name in option_fields.items():
+            self.fields[form_field_name].widget = RelatedFieldWidgetWrapper(
+                self.fields[form_field_name].widget,
+                Product._meta.get_field(model_field_name).remote_field,
+                admin.site,
+                can_add_related=True,
+                can_change_related=True,
+                can_delete_related=False,
+                can_view_related=True,
             )
 
     def clean(self):
@@ -394,7 +441,6 @@ class ProductVariantAdminForm(forms.ModelForm):
         product_name = cleaned_data.get("product_name")
         product_description = cleaned_data.get("product_description")
         attributes = cleaned_data.get("attributes") or {}
-        color_hash_code = (cleaned_data.get("color_hash_code") or "").strip()
         if not product and not product_name:
             raise ValidationError("Укажите название товара или выберите существующий продукт.")
 
@@ -403,18 +449,13 @@ class ProductVariantAdminForm(forms.ModelForm):
             self.add_error("product_description", "Описание товара должно быть минимум 50 символов.")
         if "" in attributes:
             self.add_error("attributes", "У каждой характеристики должен быть заполнен ключ.")
-        if color_hash_code:
-            if not color_hash_code.startswith("#"):
-                color_hash_code = f"#{color_hash_code}"
-                cleaned_data["color_hash_code"] = color_hash_code
-            if len(color_hash_code) != 7:
-                self.add_error("color_hash_code", "HEX-код цвета должен быть в формате #000000.")
 
         return cleaned_data
 
     def save(self, commit=True):
         instance = super().save(commit=False)
         product = self.cleaned_data.get("product") or getattr(instance, "product", None)
+        created_product = product is None
 
         if product is None:
             product = Product.objects.create(
@@ -423,6 +464,7 @@ class ProductVariantAdminForm(forms.ModelForm):
                 brand_name=self.cleaned_data.get("product_brand_name", ""),
                 brand_category=self.cleaned_data.get("product_brand_category", ""),
                 description=self.cleaned_data.get("product_description", ""),
+                memory_price=self.cleaned_data.get("product_memory_price") or {},
             )
         else:
             product_name = self.cleaned_data.get("product_name")
@@ -430,7 +472,15 @@ class ProductVariantAdminForm(forms.ModelForm):
             product_brand_category = self.cleaned_data.get("product_brand_category")
             product_category = self.cleaned_data.get("product_category")
             product_description = self.cleaned_data.get("product_description")
-            if product_name or product_category or product_brand_name or product_brand_category or product_description:
+            product_memory_price = self.cleaned_data.get("product_memory_price")
+            if (
+                product_name
+                or product_category
+                or product_brand_name
+                or product_brand_category
+                or product_description
+                or product_memory_price is not None
+            ):
                 update_fields = ["updated_at"]
                 if product_name:
                     product.name = product_name
@@ -447,10 +497,19 @@ class ProductVariantAdminForm(forms.ModelForm):
                 if product_description:
                     product.description = product_description
                     update_fields.append("description")
+                if product_memory_price is not None:
+                    product.memory_price = product_memory_price or {}
+                    update_fields.append("memory_price")
                 product.save(update_fields=update_fields)
 
+        self.sync_product_options(product, created_product=created_product)
         instance.product = product
-        instance.color = self.resolve_color(instance)
+        product_colors = list(self.cleaned_data.get("product_colors") or product.colors.all())
+        product_memories = list(self.cleaned_data.get("product_memories") or product.memories.all())
+        product_sizes = list(self.cleaned_data.get("product_sizes") or product.sizes.all())
+        instance.color = product_colors[0] if product_colors else None
+        instance.memory = product_memories[0] if product_memories else None
+        instance.size = product_sizes[0] if product_sizes else None
         instance.similar_products_sku = "\n".join(
             variant.sku for variant in self.cleaned_data.get("similar_variants", [])
         )
@@ -459,23 +518,18 @@ class ProductVariantAdminForm(forms.ModelForm):
             self.save_m2m()
         return instance
 
-    def resolve_color(self, instance):
-        color_name = (self.cleaned_data.get("color_name") or "").strip()
-        color_hash_code = (self.cleaned_data.get("color_hash_code") or "#000000").strip().upper()
-        if color_hash_code and not color_hash_code.startswith("#"):
-            color_hash_code = f"#{color_hash_code}"
+    def sync_product_options(self, product, created_product=False):
+        should_replace_options = created_product or bool(self.instance and self.instance.pk)
+        product_colors = self.cleaned_data.get("product_colors")
+        product_memories = self.cleaned_data.get("product_memories")
+        product_sizes = self.cleaned_data.get("product_sizes")
 
-        if color_name:
-            color, created = ProductColor.objects.get_or_create(
-                name=color_name,
-                defaults={"hash_code": color_hash_code or "#000000"},
-            )
-            should_update_hash = not created and color_hash_code and color_hash_code != "#000000"
-            if should_update_hash and color.hash_code != color_hash_code:
-                color.hash_code = color_hash_code
-                color.save(update_fields=["hash_code"])
-            return color
-        return self.cleaned_data.get("color") or instance.color
+        if should_replace_options or product_colors:
+            product.colors.set(product_colors or [])
+        if should_replace_options or product_memories:
+            product.memories.set(product_memories or [])
+        if should_replace_options or product_sizes:
+            product.sizes.set(product_sizes or [])
 
 
 @admin.register(ProductVariant)
@@ -526,12 +580,11 @@ class ProductVariantAdmin(admin.ModelAdmin):
         }),
         ("SKU и характеристики", {
             "fields": (
+                "product_memory_price",
+                "product_colors",
+                "product_memories",
+                "product_sizes",
                 "sku",
-                "color",
-                "color_name",
-                "color_hash_code",
-                "memory",
-                "size",
                 "attributes",
                 "similar_variants",
                 "is_active",

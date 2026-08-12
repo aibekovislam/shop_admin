@@ -172,6 +172,12 @@ class CreateVariantView(ShopScopedAPIView):
                 attributes=data.get("attributes", {}),
                 similar_products_sku=data.get("similar_products_sku", ""),
             )
+            if color:
+                product.colors.add(color)
+            if memory:
+                product.memories.add(memory)
+            if size_value:
+                product.sizes.add(size_value)
             Stock.objects.create(
                 variant=variant,
                 shop=shop,

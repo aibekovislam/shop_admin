@@ -172,6 +172,10 @@ class Product(models.Model):
         verbose_name="Категория бренда из справочника",
     )
     description = models.TextField("Описание", blank=True)
+    memory_price = models.JSONField("Цена памяти", default=dict, blank=True)
+    colors = models.ManyToManyField(ProductColor, related_name="products", blank=True, verbose_name="Цвет")
+    memories = models.ManyToManyField(Memory, related_name="products", blank=True, verbose_name="Память")
+    sizes = models.ManyToManyField(ProductSize, related_name="products", blank=True, verbose_name="Размер")
     created_at = models.DateTimeField("Создан", auto_now_add=True)
     updated_at = models.DateTimeField("Обновлён", auto_now=True)
 

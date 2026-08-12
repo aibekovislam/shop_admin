@@ -49,7 +49,12 @@ class MMarketAdapter(MarketplaceAdapter):
                 price__gte=Decimal("0.01"),
             )
             .select_related("variant__product")
-            .prefetch_related("variant__images")
+            .prefetch_related(
+                "variant__images",
+                "variant__product__colors",
+                "variant__product__memories",
+                "variant__product__sizes",
+            )
         )
         if channel_price_ids is not None:
             prices = prices.filter(id__in=channel_price_ids)
@@ -111,8 +116,9 @@ class MMarketAdapter(MarketplaceAdapter):
 
     def build_images(self, variant, public_base_url):
         image_queryset = variant.images.all()
-        if variant.color_id:
-            color_images = [image for image in image_queryset if image.color_id == variant.color_id]
+        color = self.get_variant_color(variant)
+        if color:
+            color_images = [image for image in image_queryset if image.color_id == color.id]
             if color_images:
                 image_queryset = color_images
         return [f"{public_base_url}{image.image.url}" for image in image_queryset]
@@ -132,12 +138,15 @@ class MMarketAdapter(MarketplaceAdapter):
             normalized_specs["Производители"] = product.brand_name
         if product.name and not normalized_specs.get("Модель"):
             normalized_specs["Модель"] = product.name
-        if variant.color_id and not normalized_specs.get("Цвет"):
-            normalized_specs["Цвет"] = variant.color.name
-        if variant.memory_id and not normalized_specs.get("Память"):
-            normalized_specs["Память"] = variant.memory.volume
-        if variant.size_id and not normalized_specs.get("Размер"):
-            normalized_specs["Размер"] = variant.size.name
+        color = self.get_variant_color(variant)
+        memory = self.get_variant_memory(variant)
+        size = self.get_variant_size(variant)
+        if color and not normalized_specs.get("Цвет"):
+            normalized_specs["Цвет"] = color.name
+        if memory and not normalized_specs.get("Память"):
+            normalized_specs["Память"] = memory.volume
+        if size and not normalized_specs.get("Размер"):
+            normalized_specs["Размер"] = size.name
 
         if product.brand_category and not normalized_specs.get("Тип"):
             normalized_specs["Тип"] = product.brand_category
@@ -149,6 +158,15 @@ class MMarketAdapter(MarketplaceAdapter):
             normalized_specs["Категория бренда"] = product.brand_category
 
         return normalized_specs
+
+    def get_variant_color(self, variant):
+        return variant.color or variant.product.colors.first()
+
+    def get_variant_memory(self, variant):
+        return variant.memory or variant.product.memories.first()
+
+    def get_variant_size(self, variant):
+        return variant.size or variant.product.sizes.first()
 
     def normalize_spec_key(self, key):
         aliases = {
