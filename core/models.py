@@ -102,7 +102,7 @@ class ProductColor(models.Model):
         verbose_name_plural = "Цвета товаров"
 
     def __str__(self):
-        return self.name
+        return f"{self.name} ({self.hash_code})" if self.hash_code else self.name
 
 
 class Memory(models.Model):
