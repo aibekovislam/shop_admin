@@ -3,7 +3,7 @@ from django.contrib import messages
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from django.core.exceptions import ValidationError
 from django import forms
-from django.utils.html import format_html
+from django.utils.html import format_html, format_html_join
 
 from .forms import KeyValueJSONWidget
 from .marketplace.factory import get_marketplace_adapter
@@ -18,6 +18,33 @@ from .models import (
     Stock,
     User,
 )
+
+
+def product_field_values(field_name):
+    return (
+        Product.objects.exclude(**{field_name: ""})
+        .order_by(field_name)
+        .values_list(field_name, flat=True)
+        .distinct()
+    )
+
+
+class DatalistTextInput(forms.TextInput):
+    def __init__(self, choices=None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.choices = list(choices or [])
+
+    def render(self, name, value, attrs=None, renderer=None):
+        attrs = attrs.copy() if attrs else {}
+        datalist_id = f"{attrs.get('id', f'id_{name}')}_choices"
+        attrs["list"] = datalist_id
+        input_html = super().render(name, value, attrs, renderer)
+        options_html = format_html_join(
+            "",
+            '<option value="{}"></option>',
+            ((choice,) for choice in self.choices),
+        )
+        return format_html("{}<datalist id=\"{}\">{}</datalist>", input_html, datalist_id, options_html)
 
 
 class ShopScopedAdminMixin:
@@ -73,6 +100,12 @@ class ProductAdminForm(forms.ModelForm):
     class Meta:
         model = Product
         fields = "__all__"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["category"].widget = DatalistTextInput(choices=product_field_values("category"))
+        self.fields["brand_name"].widget = DatalistTextInput(choices=product_field_values("brand_name"))
+        self.fields["brand_category"].widget = DatalistTextInput(choices=product_field_values("brand_category"))
 
     def clean_description(self):
         description = self.cleaned_data.get("description") or ""
@@ -217,6 +250,11 @@ class ProductVariantAdminForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["product_category"].widget = DatalistTextInput(choices=product_field_values("category"))
+        self.fields["product_brand_name"].widget = DatalistTextInput(choices=product_field_values("brand_name"))
+        self.fields["product_brand_category"].widget = DatalistTextInput(
+            choices=product_field_values("brand_category")
+        )
         if self.instance and self.instance.pk and self.instance.product_id:
             product = self.instance.product
             self.fields["product_name"].initial = product.name
