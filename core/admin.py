@@ -13,9 +13,12 @@ from .models import (
     BrandCategory,
     Channel,
     ChannelPrice,
+    Memory,
     Product,
     ProductCategory,
+    ProductColor,
     ProductImage,
+    ProductSize,
     ProductVariant,
     Shop,
     ShopAPIKey,
@@ -132,6 +135,32 @@ class BrandCategoryAdmin(admin.ModelAdmin):
     search_fields = ("name", "brand__name")
 
 
+@admin.register(ProductColor)
+class ProductColorAdmin(admin.ModelAdmin):
+    list_display = ("name", "hash_code", "color_preview", "created_at")
+    search_fields = ("name", "hash_code")
+
+    def color_preview(self, obj):
+        return format_html(
+            '<span style="display:inline-block;width:22px;height:22px;border:1px solid #999;background:{};"></span>',
+            obj.hash_code,
+        )
+
+    color_preview.short_description = "Цвет"
+
+
+@admin.register(Memory)
+class MemoryAdmin(admin.ModelAdmin):
+    list_display = ("volume", "created_at")
+    search_fields = ("volume",)
+
+
+@admin.register(ProductSize)
+class ProductSizeAdmin(admin.ModelAdmin):
+    list_display = ("name", "created_at")
+    search_fields = ("name",)
+
+
 class ProductAdminForm(forms.ModelForm):
     class Meta:
         model = Product
@@ -173,7 +202,7 @@ class ProductImageInline(admin.TabularInline):
 
     model = ProductImage
     extra = 1
-    fields = ("image", "image_preview", "is_primary", "order")
+    fields = ("image", "image_preview", "color", "is_primary", "order")
     readonly_fields = ("image_preview",)
 
     def image_preview(self, obj):
@@ -283,6 +312,9 @@ class ProductVariantAdminForm(forms.ModelForm):
             "product_brand_category",
             "product_description",
             "sku",
+            "color",
+            "memory",
+            "size",
             "attributes",
             "similar_variants",
             "is_active",
@@ -384,6 +416,9 @@ class ProductVariantAdmin(admin.ModelAdmin):
     list_display = (
         "product",
         "sku",
+        "variant_color",
+        "variant_memory",
+        "variant_size",
         "product_category",
         "stock_summary",
         "channel_prices_summary",
@@ -393,10 +428,13 @@ class ProductVariantAdmin(admin.ModelAdmin):
         "created_at",
         "first_image_preview",
     )
-    search_fields = ("sku", "product__name", "product__category")
+    search_fields = ("sku", "product__name", "product__category", "color__name", "memory__volume", "size__name")
     readonly_fields = ("product_id_display", "first_image_preview", "created_at")
     list_filter = (
         "is_active",
+        "color",
+        "memory",
+        "size",
         "product__category",
         "stocks__shop",
         "stocks__in_stock",
@@ -421,6 +459,9 @@ class ProductVariantAdmin(admin.ModelAdmin):
         ("SKU и характеристики", {
             "fields": (
                 "sku",
+                "color",
+                "memory",
+                "size",
                 "attributes",
                 "similar_variants",
                 "is_active",
@@ -440,7 +481,7 @@ class ProductVariantAdmin(admin.ModelAdmin):
         return (
             super()
             .get_queryset(request)
-            .select_related("product")
+            .select_related("product", "color", "memory", "size")
             .prefetch_related("images", "stocks__shop", "channel_prices__channel")
         )
 
@@ -455,6 +496,24 @@ class ProductVariantAdmin(admin.ModelAdmin):
         return obj.product.category or "-"
 
     product_category.short_description = "Категория"
+
+    def variant_color(self, obj):
+        return obj.color.name if obj.color_id else "-"
+
+    variant_color.short_description = "Цвет"
+    variant_color.admin_order_field = "color__name"
+
+    def variant_memory(self, obj):
+        return obj.memory.volume if obj.memory_id else "-"
+
+    variant_memory.short_description = "Память"
+    variant_memory.admin_order_field = "memory__volume"
+
+    def variant_size(self, obj):
+        return obj.size.name if obj.size_id else "-"
+
+    variant_size.short_description = "Размер"
+    variant_size.admin_order_field = "size__name"
 
     def photo_count(self, obj):
         return obj.images.count()

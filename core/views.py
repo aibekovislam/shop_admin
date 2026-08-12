@@ -5,7 +5,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .authentication import HasShopAPIKey
-from .models import ChannelPrice, Product, ProductVariant, Shop, Stock
+from .models import ChannelPrice, Memory, Product, ProductColor, ProductSize, ProductVariant, Shop, Stock
 from .serializers import (
     BulkUpdateItemSerializer,
     CreateVariantSerializer,
@@ -160,9 +160,15 @@ class CreateVariantView(ShopScopedAPIView):
                 brand_name=data.get("brand_name", ""),
                 brand_category=data.get("brand_category", ""),
             )
+            color = self.get_or_create_color(data.get("color", ""))
+            memory = self.get_or_create_memory(data.get("memory", ""))
+            size_value = self.get_or_create_size(data.get("size", ""))
             variant = ProductVariant.objects.create(
                 product=product,
                 sku=data.get("sku", ""),
+                color=color,
+                memory=memory,
+                size=size_value,
                 attributes=data.get("attributes", {}),
                 similar_products_sku=data.get("similar_products_sku", ""),
             )
@@ -182,3 +188,24 @@ class CreateVariantView(ShopScopedAPIView):
             },
             status=status.HTTP_201_CREATED,
         )
+
+    def get_or_create_color(self, name):
+        name = (name or "").strip()
+        if not name:
+            return None
+        color, _ = ProductColor.objects.get_or_create(name=name, defaults={"hash_code": "#000000"})
+        return color
+
+    def get_or_create_memory(self, volume):
+        volume = (volume or "").strip()
+        if not volume:
+            return None
+        memory, _ = Memory.objects.get_or_create(volume=volume)
+        return memory
+
+    def get_or_create_size(self, name):
+        name = (name or "").strip()
+        if not name:
+            return None
+        size, _ = ProductSize.objects.get_or_create(name=name)
+        return size

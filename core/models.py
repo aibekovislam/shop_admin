@@ -91,6 +91,46 @@ class BrandCategory(models.Model):
         return f"{self.brand.name} / {self.name}"
 
 
+class ProductColor(models.Model):
+    name = models.CharField("Название", max_length=120, unique=True)
+    hash_code = models.CharField("HEX-код цвета", max_length=25, default="#000000")
+    created_at = models.DateTimeField("Создан", auto_now_add=True)
+
+    class Meta:
+        ordering = ["name"]
+        verbose_name = "Цвет товара"
+        verbose_name_plural = "Цвета товаров"
+
+    def __str__(self):
+        return self.name
+
+
+class Memory(models.Model):
+    volume = models.CharField("Объём памяти", max_length=50, unique=True)
+    created_at = models.DateTimeField("Создан", auto_now_add=True)
+
+    class Meta:
+        ordering = ["volume"]
+        verbose_name = "Память"
+        verbose_name_plural = "Память"
+
+    def __str__(self):
+        return self.volume
+
+
+class ProductSize(models.Model):
+    name = models.CharField("Размер", max_length=120, unique=True)
+    created_at = models.DateTimeField("Создан", auto_now_add=True)
+
+    class Meta:
+        ordering = ["name"]
+        verbose_name = "Размер"
+        verbose_name_plural = "Размеры"
+
+    def __str__(self):
+        return self.name
+
+
 class Product(models.Model):
     """
     Глобальная карточка товара. Переиспользуется между магазинами:
@@ -183,6 +223,30 @@ class ProductVariant(models.Model):
     """
 
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="variants", verbose_name="Товар")
+    color = models.ForeignKey(
+        ProductColor,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="variants",
+        verbose_name="Цвет",
+    )
+    memory = models.ForeignKey(
+        Memory,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="variants",
+        verbose_name="Память",
+    )
+    size = models.ForeignKey(
+        ProductSize,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="variants",
+        verbose_name="Размер",
+    )
     sku = models.CharField(
         "SKU",
         max_length=100,
@@ -210,12 +274,14 @@ class ProductVariant(models.Model):
         verbose_name_plural = "Варианты товаров"
 
     def __str__(self):
-        attrs = ", ".join(f"{k}: {v}" for k, v in self.attributes.items())
+        option_attrs = self.option_attributes()
+        attrs = ", ".join(f"{k}: {v}" for k, v in {**option_attrs, **self.attributes}.items())
         return f"{self.product.name} ({attrs})" if attrs else f"{self.product.name} [{self.sku}]"
 
     def save(self, *args, **kwargs):
         if not self.sku:
             self.sku = self.generate_unique_sku()
+        self.sync_option_attributes()
         super().save(*args, **kwargs)
 
     @classmethod
@@ -230,6 +296,22 @@ class ProductVariant(models.Model):
     def similar_products_sku_list(self):
         raw_skus = self.similar_products_sku.replace(",", "\n").splitlines()
         return [sku.strip() for sku in raw_skus if sku.strip()]
+
+    def option_attributes(self):
+        attrs = {}
+        if self.color_id:
+            attrs["Цвет"] = self.color.name
+        if self.memory_id:
+            attrs["Память"] = self.memory.volume
+        if self.size_id:
+            attrs["Размер"] = self.size.name
+        return attrs
+
+    def sync_option_attributes(self):
+        attrs = dict(self.attributes or {})
+        for key, value in self.option_attributes().items():
+            attrs[key] = value
+        self.attributes = attrs
 
 
 class ProductImage(models.Model):
@@ -253,6 +335,15 @@ class ProductImage(models.Model):
         verbose_name="Вариант товара",
     )
     image = models.ImageField("Фото", upload_to="product_images/%Y/%m/")
+    color = models.ForeignKey(
+        ProductColor,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="images",
+        verbose_name="Цвет",
+        help_text="Если фото относится к конкретному цвету, выберите цвет.",
+    )
     is_primary = models.BooleanField(
         "Главное фото",
         default=False, help_text="Главное фото — то, что уходит первым на маркетплейсы"

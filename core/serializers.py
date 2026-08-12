@@ -1,12 +1,32 @@
 from rest_framework import serializers
 
-from .models import Channel, ChannelPrice, Product, ProductImage, ProductVariant, Stock
+from .models import Channel, ChannelPrice, Memory, Product, ProductColor, ProductImage, ProductSize, ProductVariant, Stock
 
 
 class ProductImageSerializer(serializers.ModelSerializer):
+    color_name = serializers.CharField(source="color.name", read_only=True)
+
     class Meta:
         model = ProductImage
-        fields = ["id", "image", "is_primary", "order"]
+        fields = ["id", "image", "color", "color_name", "is_primary", "order"]
+
+
+class ProductColorSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProductColor
+        fields = ["id", "name", "hash_code"]
+
+
+class MemorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Memory
+        fields = ["id", "volume"]
+
+
+class ProductSizeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProductSize
+        fields = ["id", "name"]
 
 
 class ChannelPriceSerializer(serializers.ModelSerializer):
@@ -37,6 +57,9 @@ class VariantListSerializer(serializers.ModelSerializer):
     """
 
     product_name = serializers.CharField(source="product.name", read_only=True)
+    color_name = serializers.CharField(source="color.name", read_only=True)
+    memory_volume = serializers.CharField(source="memory.volume", read_only=True)
+    size_name = serializers.CharField(source="size.name", read_only=True)
     images = ProductImageSerializer(many=True, read_only=True)
     wholesale_price = serializers.SerializerMethodField()
     quantity = serializers.SerializerMethodField()
@@ -49,6 +72,12 @@ class VariantListSerializer(serializers.ModelSerializer):
             "id",
             "sku",
             "product_name",
+            "color",
+            "color_name",
+            "memory",
+            "memory_volume",
+            "size",
+            "size_name",
             "attributes",
             "similar_products_sku",
             "images",
@@ -111,6 +140,9 @@ class CreateVariantSerializer(serializers.Serializer):
     brand_name = serializers.CharField(max_length=255, required=False, allow_blank=True)
     brand_category = serializers.CharField(max_length=255, required=False, allow_blank=True)
     sku = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    color = serializers.CharField(max_length=120, required=False, allow_blank=True)
+    memory = serializers.CharField(max_length=50, required=False, allow_blank=True)
+    size = serializers.CharField(max_length=120, required=False, allow_blank=True)
     attributes = serializers.DictField(required=False, default=dict)
     similar_products_sku = serializers.CharField(required=False, allow_blank=True)
     wholesale_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)

@@ -70,8 +70,8 @@ class MMarketAdapter(MarketplaceAdapter):
             product_model = variant.product
             stock = stock_by_variant.get(variant.id)
 
-            images = [f"{public_base_url}{image.image.url}" for image in variant.images.all()]
-            specs = self.build_specs(product_model, variant.attributes or {})
+            images = self.build_images(variant, public_base_url)
+            specs = self.build_specs(product_model, variant, variant.attributes or {})
 
             product_errors = self.validate_product(product_model, variant, images, specs)
             if product_errors:
@@ -109,7 +109,15 @@ class MMarketAdapter(MarketplaceAdapter):
             "products": products
         }
 
-    def build_specs(self, product, attributes):
+    def build_images(self, variant, public_base_url):
+        image_queryset = variant.images.all()
+        if variant.color_id:
+            color_images = [image for image in image_queryset if image.color_id == variant.color_id]
+            if color_images:
+                image_queryset = color_images
+        return [f"{public_base_url}{image.image.url}" for image in image_queryset]
+
+    def build_specs(self, product, variant, attributes):
         specs = {
             key: value
             for key, value in attributes.items()
@@ -119,6 +127,17 @@ class MMarketAdapter(MarketplaceAdapter):
             self.normalize_spec_key(key): value
             for key, value in specs.items()
         }
+
+        if product.brand_name and not normalized_specs.get("Производители"):
+            normalized_specs["Производители"] = product.brand_name
+        if product.name and not normalized_specs.get("Модель"):
+            normalized_specs["Модель"] = product.name
+        if variant.color_id and not normalized_specs.get("Цвет"):
+            normalized_specs["Цвет"] = variant.color.name
+        if variant.memory_id and not normalized_specs.get("Память"):
+            normalized_specs["Память"] = variant.memory.volume
+        if variant.size_id and not normalized_specs.get("Размер"):
+            normalized_specs["Размер"] = variant.size.name
 
         if product.brand_category and not normalized_specs.get("Тип"):
             normalized_specs["Тип"] = product.brand_category
