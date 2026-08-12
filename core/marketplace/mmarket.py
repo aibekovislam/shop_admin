@@ -115,13 +115,7 @@ class MMarketAdapter(MarketplaceAdapter):
         }
 
     def build_images(self, variant, public_base_url):
-        image_queryset = variant.images.all()
-        color = self.get_variant_color(variant)
-        if color:
-            color_images = [image for image in image_queryset if image.color_id == color.id]
-            if color_images:
-                image_queryset = color_images
-        return [f"{public_base_url}{image.image.url}" for image in image_queryset]
+        return [f"{public_base_url}{image.image.url}" for image in variant.images.all()]
 
     def build_specs(self, product, variant, attributes):
         specs = {

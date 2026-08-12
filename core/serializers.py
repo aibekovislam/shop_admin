@@ -4,11 +4,9 @@ from .models import Channel, ChannelPrice, Memory, Product, ProductColor, Produc
 
 
 class ProductImageSerializer(serializers.ModelSerializer):
-    color_name = serializers.CharField(source="color.name", read_only=True)
-
     class Meta:
         model = ProductImage
-        fields = ["id", "image", "color", "color_name"]
+        fields = ["id", "image"]
 
 
 class ProductColorSerializer(serializers.ModelSerializer):
