@@ -43,6 +43,45 @@ class ShopAPIKey(models.Model):
         return f"API key for {self.shop.name} ({'active' if self.is_active else 'revoked'})"
 
 
+class ProductCategory(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["name"]
+        verbose_name = "Product category"
+        verbose_name_plural = "Product categories"
+
+    def __str__(self):
+        return self.name
+
+
+class Brand(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
+class BrandCategory(models.Model):
+    brand = models.ForeignKey(Brand, on_delete=models.CASCADE, related_name="categories")
+    name = models.CharField(max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["brand__name", "name"]
+        unique_together = [("brand", "name")]
+        verbose_name = "Brand category"
+        verbose_name_plural = "Brand categories"
+
+    def __str__(self):
+        return f"{self.brand.name} / {self.name}"
+
+
 class Product(models.Model):
     """
     Глобальная карточка товара. Переиспользуется между магазинами:
@@ -52,11 +91,32 @@ class Product(models.Model):
 
     name = models.CharField(max_length=255)
     category = models.CharField(max_length=255, blank=True)
+    category_ref = models.ForeignKey(
+        ProductCategory,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="products",
+    )
     brand_name = models.CharField(max_length=255, blank=True)
+    brand_ref = models.ForeignKey(
+        Brand,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="products",
+    )
     brand_category = models.CharField(
         max_length=255,
         blank=True,
         help_text="Категория внутри бренда: iPhone, MacBook, AirPods и т.п.",
+    )
+    brand_category_ref = models.ForeignKey(
+        BrandCategory,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="products",
     )
     description = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -67,6 +127,36 @@ class Product(models.Model):
 
     def __str__(self):
         return self.name
+
+    def save(self, *args, **kwargs):
+        self.sync_catalog_refs()
+        super().save(*args, **kwargs)
+
+    def sync_catalog_refs(self):
+        category_name = self.category.strip()
+        brand_name = self.brand_name.strip()
+        brand_category_name = self.brand_category.strip()
+
+        if category_name:
+            self.category = category_name
+            self.category_ref, _ = ProductCategory.objects.get_or_create(name=category_name)
+        else:
+            self.category_ref = None
+
+        if brand_name:
+            self.brand_name = brand_name
+            self.brand_ref, _ = Brand.objects.get_or_create(name=brand_name)
+        else:
+            self.brand_ref = None
+
+        if self.brand_ref and brand_category_name:
+            self.brand_category = brand_category_name
+            self.brand_category_ref, _ = BrandCategory.objects.get_or_create(
+                brand=self.brand_ref,
+                name=brand_category_name,
+            )
+        else:
+            self.brand_category_ref = None
 
 
 class ProductVariant(models.Model):

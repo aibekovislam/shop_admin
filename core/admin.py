@@ -8,9 +8,12 @@ from django.utils.html import format_html, format_html_join
 from .forms import KeyValueJSONWidget
 from .marketplace.factory import get_marketplace_adapter
 from .models import (
+    Brand,
+    BrandCategory,
     Channel,
     ChannelPrice,
     Product,
+    ProductCategory,
     ProductImage,
     ProductVariant,
     Shop,
@@ -20,13 +23,8 @@ from .models import (
 )
 
 
-def product_field_values(field_name):
-    return (
-        Product.objects.exclude(**{field_name: ""})
-        .order_by(field_name)
-        .values_list(field_name, flat=True)
-        .distinct()
-    )
+def model_name_values(model):
+    return model.objects.order_by("name").values_list("name", flat=True).distinct()
 
 
 class DatalistTextInput(forms.TextInput):
@@ -96,6 +94,38 @@ class ShopAPIKeyAdmin(ShopScopedAdminMixin, admin.ModelAdmin):
     readonly_fields = ("key", "created_at", "last_used_at")
 
 
+@admin.register(ProductCategory)
+class ProductCategoryAdmin(admin.ModelAdmin):
+    list_display = ("name", "created_at")
+    search_fields = ("name",)
+
+
+class BrandCategoryInline(admin.TabularInline):
+    model = BrandCategory
+    extra = 1
+    fields = ("name", "created_at")
+    readonly_fields = ("created_at",)
+
+
+@admin.register(Brand)
+class BrandAdmin(admin.ModelAdmin):
+    list_display = ("name", "brand_categories", "created_at")
+    search_fields = ("name",)
+    inlines = [BrandCategoryInline]
+
+    def brand_categories(self, obj):
+        return ", ".join(obj.categories.values_list("name", flat=True)) or "-"
+
+    brand_categories.short_description = "Категории бренда"
+
+
+@admin.register(BrandCategory)
+class BrandCategoryAdmin(admin.ModelAdmin):
+    list_display = ("brand", "name", "created_at")
+    list_filter = ("brand",)
+    search_fields = ("name", "brand__name")
+
+
 class ProductAdminForm(forms.ModelForm):
     class Meta:
         model = Product
@@ -103,9 +133,9 @@ class ProductAdminForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["category"].widget = DatalistTextInput(choices=product_field_values("category"))
-        self.fields["brand_name"].widget = DatalistTextInput(choices=product_field_values("brand_name"))
-        self.fields["brand_category"].widget = DatalistTextInput(choices=product_field_values("brand_category"))
+        self.fields["category"].widget = DatalistTextInput(choices=model_name_values(ProductCategory))
+        self.fields["brand_name"].widget = DatalistTextInput(choices=model_name_values(Brand))
+        self.fields["brand_category"].widget = DatalistTextInput(choices=model_name_values(BrandCategory))
 
     def clean_description(self):
         description = self.cleaned_data.get("description") or ""
@@ -126,6 +156,7 @@ class ProductAdmin(admin.ModelAdmin):
     form = ProductAdminForm
     list_display = ("name", "category", "brand_name", "brand_category", "created_at")
     search_fields = ("name", "category", "brand_name", "brand_category")
+    readonly_fields = ("category_ref", "brand_ref", "brand_category_ref")
 
 
 class ProductImageInline(admin.TabularInline):
@@ -250,10 +281,10 @@ class ProductVariantAdminForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["product_category"].widget = DatalistTextInput(choices=product_field_values("category"))
-        self.fields["product_brand_name"].widget = DatalistTextInput(choices=product_field_values("brand_name"))
+        self.fields["product_category"].widget = DatalistTextInput(choices=model_name_values(ProductCategory))
+        self.fields["product_brand_name"].widget = DatalistTextInput(choices=model_name_values(Brand))
         self.fields["product_brand_category"].widget = DatalistTextInput(
-            choices=product_field_values("brand_category")
+            choices=model_name_values(BrandCategory)
         )
         if self.instance and self.instance.pk and self.instance.product_id:
             product = self.instance.product
