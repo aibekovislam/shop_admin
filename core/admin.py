@@ -23,6 +23,11 @@ from .models import (
 )
 
 
+admin.site.site_header = "Админка магазина"
+admin.site.site_title = "Админка магазина"
+admin.site.index_title = "Управление каталогом"
+
+
 def model_name_values(model):
     return model.objects.order_by("name").values_list("name", flat=True).distinct()
 
@@ -403,11 +408,6 @@ class ProductVariantAdmin(admin.ModelAdmin):
                 "is_active",
                 "sync_after_save",
                 "created_at",
-            ),
-            "description": (
-                "Для M-Market используйте характеристики: Тип, Производители, Память, Цвет. "
-                "Можно писать цвет/модель/производитель маленькими буквами — при отправке в M-Market ключи нормализуются. "
-                "Бренд можно заполнить отдельным полем выше; для Bakai Market он уйдёт как brand_name."
             ),
         }),
     )
