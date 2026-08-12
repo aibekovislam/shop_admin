@@ -352,12 +352,12 @@ class ProductImage(models.Model):
     created_at = models.DateTimeField("Создано", auto_now_add=True)
 
     class Meta:
-        ordering = ["order", "created_at"]
+        ordering = ["created_at", "id"]
         verbose_name = "Фото товара"
         verbose_name_plural = "Фото товаров"
 
     def __str__(self):
-        return f"Фото для {self.variant} (#{self.order})"
+        return f"Фото для {self.variant}"
 
 
 class Channel(models.Model):

@@ -8,7 +8,7 @@ class ProductImageSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ProductImage
-        fields = ["id", "image", "color", "color_name", "is_primary", "order"]
+        fields = ["id", "image", "color", "color_name"]
 
 
 class ProductColorSerializer(serializers.ModelSerializer):

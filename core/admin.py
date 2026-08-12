@@ -202,7 +202,7 @@ class ProductImageInline(admin.TabularInline):
 
     model = ProductImage
     extra = 1
-    fields = ("image", "image_preview", "color", "is_primary", "order")
+    fields = ("image", "image_preview", "color")
     readonly_fields = ("image_preview",)
 
     def image_preview(self, obj):
