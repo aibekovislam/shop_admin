@@ -18,7 +18,7 @@ from core.models import (
 
 class MMarketAdapter(MarketplaceAdapter):
     DEFAULT_API_URL = "https://m-market.kg/api/crm/products/import_products/"
-    REQUIRED_SPEC_KEYS = ("Тип", "Производители", "Модель", "Цвет")
+    REQUIRED_SPEC_KEYS = ("Тип", "Производители", "Цвет")
 
     def __init__(self, channel):
         self.channel = channel
@@ -120,12 +120,12 @@ class MMarketAdapter(MarketplaceAdapter):
             for key, value in specs.items()
         }
 
-        if product.category and not normalized_specs.get("Тип"):
+        if product.brand_category and not normalized_specs.get("Тип"):
+            normalized_specs["Тип"] = product.brand_category
+        elif product.category and not normalized_specs.get("Тип"):
             normalized_specs["Тип"] = product.category
         if product.brand_name and not normalized_specs.get("Производители"):
             normalized_specs["Производители"] = product.brand_name
-        if product.name and not normalized_specs.get("Модель"):
-            normalized_specs["Модель"] = product.name
         if product.brand_category and not normalized_specs.get("Категория бренда"):
             normalized_specs["Категория бренда"] = product.brand_category
 
@@ -140,6 +140,8 @@ class MMarketAdapter(MarketplaceAdapter):
             "brand": "Производители",
             "модель": "Модель",
             "model": "Модель",
+            "память": "Память",
+            "memory": "Память",
             "цвет": "Цвет",
             "color": "Цвет",
         }
