@@ -301,6 +301,7 @@ class Command(BaseCommand):
             "omarket_length": item["length"],
             "omarket_weight": item["weight"],
             "omarket_filters": filters,
+            "omarket_attributes": self.omarket_attributes_from_filters(filters),
         }
         variant, _ = ProductVariant.objects.update_or_create(
             sku=item["sku"],
@@ -352,6 +353,7 @@ class Command(BaseCommand):
                     "omarket_length": item["length"],
                     "omarket_weight": item["weight"],
                     "omarket_filters": filters_by_item[item["sku"]],
+                    "omarket_attributes": self.omarket_attributes_from_filters(filters_by_item[item["sku"]]),
                 }
             )
             legacy_variant.attributes = legacy_attrs
@@ -483,6 +485,13 @@ class Command(BaseCommand):
             **item["omarket_static_filters"],
         }
         return [{"filter_id": filter_id, "option_id": option_id} for filter_id, option_id in filters.items()]
+
+    def omarket_attributes_from_filters(self, filters):
+        return [
+            {"attribute_id": item["filter_id"], "value_id": item["option_id"]}
+            for item in filters
+            if item.get("filter_id") and item.get("option_id")
+        ]
 
     def fetch_category_attributes(self, channel, category_id, timeout):
         try:

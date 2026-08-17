@@ -140,6 +140,14 @@ class OMarketAdapter(MarketplaceAdapter):
         omarket_attributes = attrs.get("omarket_attributes")
         if omarket_attributes not in (None, "") and not isinstance(omarket_attributes, list):
             errors.append("omarket_attributes должен быть списком")
+        elif isinstance(omarket_attributes, list):
+            invalid_attributes = [
+                attribute
+                for attribute in omarket_attributes
+                if not isinstance(attribute, dict) or not attribute.get("attribute_id") or not attribute.get("value_id")
+            ]
+            if invalid_attributes:
+                errors.append("omarket_attributes должен содержать attribute_id и value_id")
         omarket_filters = attrs.get("omarket_filters")
         if omarket_filters not in (None, "") and not isinstance(omarket_filters, list):
             errors.append("omarket_filters должен быть списком")
