@@ -1,7 +1,7 @@
 import json
 from decimal import Decimal
-from pathlib import Path
-from urllib.parse import urlencode, urljoin
+from pathlib import PurePosixPath
+from urllib.parse import urlencode, urljoin, urlparse
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -362,11 +362,19 @@ class Command(BaseCommand):
         return price_ids
 
     def ensure_images(self, variant, item):
-        if variant.images.count() >= 3:
+        existing_images = list(variant.images.all())
+        has_valid_images = len(existing_images) >= 3 and all(
+            urlparse(image.image.url).path.lower().endswith((".jpg", ".jpeg", ".png"))
+            for image in existing_images
+        )
+        if has_valid_images:
             return
         variant.images.all().delete()
         for index, image_url in enumerate(item["image_urls"]):
-            content = self.download_image(image_url, f"{item['sku'].lower()}_{index}{Path(image_url).suffix or '.jpg'}")
+            suffix = PurePosixPath(urlparse(image_url).path).suffix.lower()
+            if suffix not in {".jpg", ".jpeg", ".png"}:
+                suffix = ".jpg"
+            content = self.download_image(image_url, f"{item['sku'].lower()}_{index}{suffix}")
             ProductImage.objects.create(
                 variant=variant,
                 image=content,
