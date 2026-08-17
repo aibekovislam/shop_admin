@@ -119,6 +119,37 @@ IPHONES = [
             "https://www.pngmart.com/files/24/iPhone-17-Pro-Max-PNG.png",
         ],
     },
+    {
+        "sku": "IP16PMSM256BLK",
+        "name": "iPhone 16 Pro Max 256GB Black Titanium",
+        "model": "iPhone 16 Pro Max",
+        "price": Decimal("119990.00"),
+        "memory": "256GB",
+        "color": ("Black", "#1d1d1f"),
+        "width": 77.6,
+        "height": 163.0,
+        "length": 8.25,
+        "weight": 0.227,
+        "screen": "6.9-inch Super Retina XDR OLED, 2868x1320, 460 ppi, ProMotion 120Hz",
+        "screen_size": "6.9",
+        "os": "iOS",
+        "sim": "Nano-SIM и eSIM",
+        "network": "5G",
+        "connector": "USB-C",
+        "chip": "A18 Pro",
+        "camera": "48MP Fusion Main + 48MP Ultra Wide + 12MP Telephoto, 12MP front camera",
+        "battery": "Video playback up to 33 hours",
+        "omarket_static_filters": {
+            4072: 66602,
+            4079: 66619,
+            2081: 74800,
+        },
+        "image_urls": [
+            "https://www.apple.com/v/iphone/compare/ai/images/overview/compare_iphone16_pro_max_black_titanium__etrij8y98ga6_large_2x.jpg",
+            "https://www.buyitdirect.ie/Images/MYWV3QNA_2_Supersize.png?v=3",
+            "https://pngate.com/wp-content/uploads/2025/03/iphone-16-pro-max-back-black-titanium-1.png",
+        ],
+    },
 ]
 
 
@@ -138,6 +169,7 @@ class Command(BaseCommand):
         parser.add_argument("--price-17", type=Decimal, default=Decimal("79990.00"))
         parser.add_argument("--price-17-pro", type=Decimal, default=Decimal("109990.00"))
         parser.add_argument("--price-17-pro-max", type=Decimal, default=Decimal("129990.00"))
+        parser.add_argument("--price-16-pro-max", type=Decimal, default=Decimal("119990.00"))
         parser.add_argument("--dry-run", action="store_true", help="Создать товары и показать payload без отправки.")
         parser.add_argument("--skip-images", action="store_true", help="Не скачивать фото, если они уже есть.")
         parser.add_argument(
@@ -165,7 +197,12 @@ class Command(BaseCommand):
             self.stdout.write(json.dumps(self.serialize_attributes(attributes), ensure_ascii=False, indent=2))
             return
         filters_by_item = self.resolve_filters_by_item(channel, category_id, options["attribute_timeout"])
-        prices = [options["price_17"], options["price_17_pro"], options["price_17_pro_max"]]
+        prices = [
+            options["price_17"],
+            options["price_17_pro"],
+            options["price_17_pro_max"],
+            options["price_16_pro_max"],
+        ]
         payload_ids = []
 
         with transaction.atomic():
