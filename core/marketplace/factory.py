@@ -8,6 +8,7 @@ def get_marketplace_adapter(channel):
     adapters = {
         "mmarket": MMarketAdapter,
         "omarket": OMarketAdapter,
+        "omarketshat": OMarketAdapter,
         "bakai": BakaiMarketAdapter,
     }
 
