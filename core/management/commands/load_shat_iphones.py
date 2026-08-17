@@ -27,7 +27,8 @@ from core.models import (
 
 IPHONES = [
     {
-        "sku": "IP17SHAT256BLKA",
+        "sku": "IP17SMRT256BLK",
+        "legacy_sku": "IP17SHAT256BLKA",
         "name": "iPhone 17 256GB Black",
         "model": "iPhone 17",
         "price": Decimal("79990.00"),
@@ -48,7 +49,8 @@ IPHONES = [
         ],
     },
     {
-        "sku": "IP17PRO256ORNGX",
+        "sku": "IP17PSM256ORG",
+        "legacy_sku": "IP17PRO256ORNGX",
         "name": "iPhone 17 Pro 256GB Cosmic Orange",
         "model": "iPhone 17 Pro",
         "price": Decimal("109990.00"),
@@ -69,7 +71,8 @@ IPHONES = [
         ],
     },
     {
-        "sku": "IP17PMAX256BLUE",
+        "sku": "IP17PMSM256BLU",
+        "legacy_sku": "IP17PMAX256BLUE",
         "name": "iPhone 17 Pro Max 256GB Deep Blue",
         "model": "iPhone 17 Pro Max",
         "price": Decimal("129990.00"),
@@ -110,6 +113,11 @@ class Command(BaseCommand):
         parser.add_argument("--price-17-pro-max", type=Decimal, default=Decimal("129990.00"))
         parser.add_argument("--dry-run", action="store_true", help="Создать товары и показать payload без отправки.")
         parser.add_argument("--skip-images", action="store_true", help="Не скачивать фото, если они уже есть.")
+        parser.add_argument(
+            "--keep-old-skus",
+            action="store_true",
+            help="Не обнулять старые SKU, которые ранее были созданы в неправильной категории.",
+        )
 
     def handle(self, *args, **options):
         channel = self.get_channel(options)
@@ -145,6 +153,9 @@ class Command(BaseCommand):
                 if not options["skip_images"]:
                     self.ensure_images(variant, item)
 
+            if not options["keep_old_skus"]:
+                payload_ids.extend(self.deactivate_legacy_skus(channel, category_id, filters_by_item))
+
             similar_skus = [variant.sku for variant in variants]
             for variant in variants:
                 variant.similar_products_sku = "\n".join(sku for sku in similar_skus if sku != variant.sku)
@@ -160,6 +171,7 @@ class Command(BaseCommand):
 
         result = adapter.push_products(channel_price_ids=payload_ids)
         self.stdout.write(self.style.SUCCESS(f"Отправлено в {channel}: {result}"))
+        self.print_import_status(adapter, result)
 
     def get_channel(self, options):
         if options["channel_id"]:
@@ -243,6 +255,33 @@ class Command(BaseCommand):
         )
         return price_obj
 
+    def deactivate_legacy_skus(self, channel, category_id, filters_by_item):
+        price_ids = []
+        for item in IPHONES:
+            legacy_sku = item.get("legacy_sku")
+            if not legacy_sku:
+                continue
+            legacy_variant = ProductVariant.objects.filter(sku=legacy_sku).select_related("product").first()
+            if not legacy_variant:
+                continue
+            legacy_attrs = dict(legacy_variant.attributes or {})
+            legacy_attrs.update(
+                {
+                    "omarket_category_id": category_id,
+                    "omarket_width": item["width"],
+                    "omarket_height": item["height"],
+                    "omarket_length": item["length"],
+                    "omarket_weight": item["weight"],
+                    "omarket_filters": filters_by_item[item["sku"]],
+                }
+            )
+            legacy_variant.attributes = legacy_attrs
+            legacy_variant.save(update_fields=["attributes"])
+            self.upsert_stock(legacy_variant, channel.shop, 0)
+            price_obj = self.upsert_price(legacy_variant, channel, item["price"])
+            price_ids.append(price_obj.id)
+        return price_ids
+
     def ensure_images(self, variant, item):
         if variant.images.count() >= 3:
             return
@@ -260,6 +299,18 @@ class Command(BaseCommand):
         request = Request(url, headers={"User-Agent": "Mozilla/5.0"})
         with urlopen(request, timeout=30) as response:
             return ContentFile(response.read(), name=filename)
+
+    def print_import_status(self, adapter, result):
+        task_id = (result.get("result") or {}).get("task_id") if isinstance(result, dict) else None
+        if not task_id:
+            return
+        try:
+            status = adapter.get_import_status(task_id)
+        except Exception as exc:
+            self.stdout.write(self.style.WARNING(f"Не удалось проверить task_id {task_id}: {exc}"))
+            return
+        self.stdout.write(self.style.SUCCESS(f"Статус task_id {task_id}:"))
+        self.stdout.write(json.dumps(status, ensure_ascii=False, indent=2))
 
     def resolve_category_id(self, channel, category_name):
         tree = self.send_omarket_json(channel, "api/mia/v1/category/tree")
