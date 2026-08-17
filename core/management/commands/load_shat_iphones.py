@@ -315,7 +315,7 @@ class Command(BaseCommand):
     def fetch_category_attributes(self, channel, category_id):
         try:
             payload = self.send_omarket_json(channel, f"api/mia/v1/category/attribute?{urlencode({'category': category_id})}")
-        except CommandError as exc:
+        except (CommandError, TimeoutError) as exc:
             self.stdout.write(self.style.WARNING(f"Не удалось получить характеристики O!Market: {exc}"))
             return []
         return payload.get("result") or []
