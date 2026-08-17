@@ -200,15 +200,6 @@ class Command(BaseCommand):
             "omarket_height": item["height"],
             "omarket_length": item["length"],
             "omarket_weight": item["weight"],
-            "omarket_attributes": [
-                {"name": "Бренд", "value": "Apple"},
-                {"name": "Модель", "value": item["model"]},
-                {"name": "Память", "value": item["memory"]},
-                {"name": "Цвет", "value": color.name},
-                {"name": "Экран", "value": item["screen"]},
-                {"name": "Процессор", "value": item["chip"]},
-                {"name": "Камера", "value": item["camera"]},
-            ],
         }
         variant, _ = ProductVariant.objects.update_or_create(
             sku=item["sku"],
