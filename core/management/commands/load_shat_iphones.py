@@ -146,7 +146,7 @@ IPHONES = [
         },
         "image_urls": [
             "https://www.apple.com/v/iphone/compare/ai/images/overview/compare_iphone16_pro_max_black_titanium__etrij8y98ga6_large_2x.jpg",
-            "https://www.buyitdirect.ie/Images/MYWV3QNA_2_Supersize.png?v=3",
+            "https://www.buyitdirect.ie/Images/MYWV3QNA_2_Supersize.png",
             "https://pngate.com/wp-content/uploads/2025/03/iphone-16-pro-max-back-black-titanium-1.png",
         ],
     },
