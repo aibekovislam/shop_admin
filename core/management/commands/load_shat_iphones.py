@@ -47,6 +47,10 @@ IPHONES = [
         "chip": "A19",
         "camera": "48MP Dual Fusion: Main + Ultra Wide, 18MP Center Stage front camera",
         "battery": "Video playback up to 30 hours",
+        "omarket_static_filters": {
+            4072: 66602,
+            4079: 66618,
+        },
         "image_urls": [
             "https://www.apple.com/v/iphone-17/h/images/overview/highlights/cameras/cameras__bp927f4j5vqu_large.png",
             "https://www.apple.com/v/iphone-17/h/images/overview/cameras/back-camera/hero_rear_camera__baka63bo73ma_xlarge.png",
@@ -74,6 +78,10 @@ IPHONES = [
         "chip": "A19 Pro",
         "camera": "48MP Pro Fusion: Main, Ultra Wide, Telephoto, up to 8x optical-quality zoom",
         "battery": "Video playback up to 33 hours",
+        "omarket_static_filters": {
+            4072: 66592,
+            4079: 66619,
+        },
         "image_urls": [
             "https://www.apple.com/v/iphone-17-pro/h/images/specs/dimensions_iphone_pro__njr21lxl7pe2_large.jpg",
             "https://www.apple.com/v/iphone-17-pro/h/images/specs/external_connectors__6srsbgigl5ei_large.jpg",
@@ -101,6 +109,10 @@ IPHONES = [
         "chip": "A19 Pro",
         "camera": "48MP Pro Fusion: Main, Ultra Wide, Telephoto, up to 8x optical-quality zoom",
         "battery": "Video playback up to 39 hours",
+        "omarket_static_filters": {
+            4072: 66600,
+            4079: 66619,
+        },
         "image_urls": [
             "https://www.apple.com/v/iphone-17-pro/h/images/specs/dimensions_iphone_pro_max__cmfii10i2owi_large.jpg",
             "https://www.apple.com/v/iphone-17-pro/h/images/specs/external_connectors__6srsbgigl5ei_large.jpg",
@@ -395,10 +407,7 @@ class Command(BaseCommand):
             if category_id == 16:
                 filters = self.merge_missing_filters(
                     filters,
-                    [
-                        {"filter_id": 1208, "option_id": 8132},
-                        {"filter_id": 677, "option_id": 7051},
-                    ],
+                    self.static_smartphone_filters(item),
                 )
             filters_by_item[item["sku"]] = filters
         return filters_by_item
@@ -406,6 +415,29 @@ class Command(BaseCommand):
     def merge_missing_filters(self, filters, defaults):
         used_filter_ids = {item.get("filter_id") for item in filters}
         return [*filters, *[item for item in defaults if item["filter_id"] not in used_filter_ids]]
+
+    def static_smartphone_filters(self, item):
+        filters = {
+            606: 2781,  # Бренд смартфоны: Apple
+            4070: 66575,  # Объем встроенной памяти смартфоны: 256 ГБ
+            4071: 66578,  # Поддержка 5G смартфоны: да
+            2063: 10953,  # SIM-карты смартфоны: nanoSIM + eSIM
+            4076: 66611,  # 4G (LTE) смартфоны: да
+            2082: 10980,  # Интерфейс: USB Type-C
+            4073: 66603,  # Технология NFC смартфоны: да
+            2062: 10943,  # Функции и возможности смартфоны: Face ID
+            2081: 66567,  # Материал корпуса смартфоны: ceramic Shield
+            4074: 66608,  # Операционная система смартфоны: iOS
+            4075: 66609,  # Поддержка беспроводной зарядки смартфоны: да
+            4077: 66613,  # Фронтальная камера смартфоны: да
+            4078: 66616,  # Слот карт памяти смартфоны: нет
+            4080: 66621,  # Тип аккумулятора смартфоны: Li-ion
+            677: 7051,  # Тип (смартфона): Моноблок (классический)
+            1208: 8132,  # Состояние: Новый
+            2041: 10913,  # Техническое состояние смартфоны: Идеальное
+            **item["omarket_static_filters"],
+        }
+        return [{"filter_id": filter_id, "option_id": option_id} for filter_id, option_id in filters.items()]
 
     def fetch_category_attributes(self, channel, category_id, timeout):
         try:
