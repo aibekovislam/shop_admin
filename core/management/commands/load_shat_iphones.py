@@ -139,10 +139,19 @@ class Command(BaseCommand):
             action="store_true",
             help="Не обнулять старые SKU, которые ранее были созданы в неправильной категории.",
         )
+        parser.add_argument(
+            "--dump-attributes",
+            action="store_true",
+            help="Показать справочник характеристик O!Market для категории и выйти без создания товаров.",
+        )
 
     def handle(self, *args, **options):
         channel = self.get_channel(options)
         category_id = options["category_id"] or self.resolve_category_id(channel, options["category_name"])
+        if options["dump_attributes"]:
+            attributes = self.fetch_category_attributes(channel, category_id, options["attribute_timeout"])
+            self.stdout.write(json.dumps(self.serialize_attributes(attributes), ensure_ascii=False, indent=2))
+            return
         filters_by_item = self.resolve_filters_by_item(channel, category_id, options["attribute_timeout"])
         prices = [options["price_17"], options["price_17_pro"], options["price_17_pro_max"]]
         payload_ids = []
@@ -420,22 +429,36 @@ class Command(BaseCommand):
                 continue
             option = self.find_option(self.attribute_options(attribute), values)
             if option:
-                filters.append({"filter_id": int(self.object_id(attribute)), "option_id": int(self.object_id(option))})
+                filter_item = {"filter_id": int(self.object_id(attribute)), "option_id": int(self.object_id(option))}
+                if filter_item not in filters:
+                    filters.append(filter_item)
         return filters
 
     def find_attribute(self, attributes, labels):
-        normalized_labels = {self.normalize(label) for label in labels}
+        normalized_labels = {self.normalize_search(label) for label in labels}
         for attribute in attributes:
             label = attribute.get("create_label") or attribute.get("name") or attribute.get("label")
-            if self.normalize(label) in normalized_labels:
+            normalized_label = self.normalize_search(label)
+            if normalized_label in normalized_labels:
+                return attribute
+        for attribute in attributes:
+            label = attribute.get("create_label") or attribute.get("name") or attribute.get("label")
+            normalized_label = self.normalize_search(label)
+            if any(self.safe_contains(normalized_label, expected) for expected in normalized_labels):
                 return attribute
         return None
 
     def find_option(self, options, values):
-        normalized_values = {self.normalize(value) for value in values}
+        normalized_values = {self.normalize_search(value) for value in values}
         for option in options:
             value = option.get("value") or option.get("name") or option.get("label")
-            if self.normalize(value) in normalized_values:
+            normalized_value = self.normalize_search(value)
+            if normalized_value in normalized_values:
+                return option
+        for option in options:
+            value = option.get("value") or option.get("name") or option.get("label")
+            normalized_value = self.normalize_search(value)
+            if any(self.safe_contains(normalized_value, expected) for expected in normalized_values):
                 return option
         return None
 
@@ -444,6 +467,24 @@ class Command(BaseCommand):
 
     def object_id(self, item):
         return item.get("id") or item.get("filter_id") or item.get("option_id") or item.get("value_id")
+
+    def serialize_attributes(self, attributes):
+        serialized = []
+        for attribute in attributes:
+            serialized.append(
+                {
+                    "id": self.object_id(attribute),
+                    "label": attribute.get("create_label") or attribute.get("name") or attribute.get("label"),
+                    "values": [
+                        {
+                            "id": self.object_id(option),
+                            "value": option.get("value") or option.get("name") or option.get("label"),
+                        }
+                        for option in self.attribute_options(attribute)
+                    ],
+                }
+            )
+        return serialized
 
     def russian_color(self, color_name):
         return {
@@ -475,3 +516,23 @@ class Command(BaseCommand):
 
     def normalize(self, value):
         return str(value or "").strip().casefold().replace("ё", "е")
+
+    def normalize_search(self, value):
+        normalized = self.normalize(value)
+        replacements = {
+            "gb": "гб",
+            "type c": "type-c",
+            "usb c": "usb-c",
+            "nano sim": "nano-sim",
+            "‑": "-",
+            "–": "-",
+            "—": "-",
+        }
+        for old, new in replacements.items():
+            normalized = normalized.replace(old, new)
+        return " ".join(normalized.replace('"', "").split())
+
+    def safe_contains(self, actual, expected):
+        if len(expected) < 3:
+            return actual == expected
+        return expected in actual or actual in expected
