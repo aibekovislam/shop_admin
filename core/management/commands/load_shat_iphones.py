@@ -39,6 +39,11 @@ IPHONES = [
         "length": 7.95,
         "weight": 0.177,
         "screen": "6.3-inch Super Retina XDR OLED, 2622x1206, 460 ppi, ProMotion 120Hz",
+        "screen_size": "6.3",
+        "os": "iOS",
+        "sim": "Nano-SIM и eSIM",
+        "network": "5G",
+        "connector": "USB-C",
         "chip": "A19",
         "camera": "48MP Dual Fusion: Main + Ultra Wide, 18MP Center Stage front camera",
         "battery": "Video playback up to 30 hours",
@@ -61,6 +66,11 @@ IPHONES = [
         "length": 8.75,
         "weight": 0.206,
         "screen": "6.3-inch Super Retina XDR OLED, 2622x1206, 460 ppi, ProMotion 120Hz",
+        "screen_size": "6.3",
+        "os": "iOS",
+        "sim": "Nano-SIM и eSIM",
+        "network": "5G",
+        "connector": "USB-C",
         "chip": "A19 Pro",
         "camera": "48MP Pro Fusion: Main, Ultra Wide, Telephoto, up to 8x optical-quality zoom",
         "battery": "Video playback up to 33 hours",
@@ -83,6 +93,11 @@ IPHONES = [
         "length": 8.75,
         "weight": 0.233,
         "screen": "6.9-inch Super Retina XDR OLED, 2868x1320, 460 ppi, ProMotion 120Hz",
+        "screen_size": "6.9",
+        "os": "iOS",
+        "sim": "Nano-SIM и eSIM",
+        "network": "5G",
+        "connector": "USB-C",
         "chip": "A19 Pro",
         "camera": "48MP Pro Fusion: Main, Ultra Wide, Telephoto, up to 8x optical-quality zoom",
         "battery": "Video playback up to 39 hours",
@@ -114,6 +129,12 @@ class Command(BaseCommand):
         parser.add_argument("--dry-run", action="store_true", help="Создать товары и показать payload без отправки.")
         parser.add_argument("--skip-images", action="store_true", help="Не скачивать фото, если они уже есть.")
         parser.add_argument(
+            "--attribute-timeout",
+            type=int,
+            default=90,
+            help="Таймаут запроса характеристик O!Market в секундах.",
+        )
+        parser.add_argument(
             "--keep-old-skus",
             action="store_true",
             help="Не обнулять старые SKU, которые ранее были созданы в неправильной категории.",
@@ -122,7 +143,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         channel = self.get_channel(options)
         category_id = options["category_id"] or self.resolve_category_id(channel, options["category_name"])
-        filters_by_item = self.resolve_filters_by_item(channel, category_id)
+        filters_by_item = self.resolve_filters_by_item(channel, category_id, options["attribute_timeout"])
         prices = [options["price_17"], options["price_17_pro"], options["price_17_pro_max"]]
         payload_ids = []
 
@@ -329,8 +350,8 @@ class Command(BaseCommand):
                 return found
         return None
 
-    def resolve_filters_by_item(self, channel, category_id):
-        attributes = self.fetch_category_attributes(channel, category_id)
+    def resolve_filters_by_item(self, channel, category_id, timeout):
+        attributes = self.fetch_category_attributes(channel, category_id, timeout)
         filters_by_item = {}
         for item in IPHONES:
             color_name, _ = item["color"]
@@ -340,12 +361,26 @@ class Command(BaseCommand):
                     ("Состояние",): ["Новый"],
                     ("Гаджеты", "Тип товара", "Тип"): ["Мобильные телефоны", "Смартфоны"],
                     ("Бренд", "Производитель", "Производители"): ["Apple"],
-                    ("Модель",): [item["model"]],
-                    ("Память", "Встроенная память", "Объем памяти", "Объём памяти"): [
+                    ("Модель", "Линейка", "Серия"): [item["model"]],
+                    ("Память", "Встроенная память", "Объем встроенной памяти", "Объём встроенной памяти", "Объем памяти", "Объём памяти"): [
                         item["memory"],
                         item["memory"].replace("GB", " GB"),
+                        item["memory"].replace("GB", " ГБ"),
+                        item["memory"].replace("GB", "Gb"),
                     ],
-                    ("Цвет",): [color_name],
+                    ("Цвет", "Цвет товара"): [color_name, *self.russian_color(color_name)],
+                    ("Диагональ", "Диагональ экрана", "Размер экрана"): [
+                        item["screen_size"],
+                        f"{item['screen_size']} дюйм",
+                        f"{item['screen_size']} дюймов",
+                        f"{item['screen_size']}\"",
+                    ],
+                    ("Операционная система", "ОС"): [item["os"], "iOS"],
+                    ("Процессор", "Чип", "Чипсет"): [item["chip"]],
+                    ("Тип матрицы", "Тип экрана", "Экран", "Дисплей"): ["OLED", "Super Retina XDR", "Super Retina XDR OLED"],
+                    ("Стандарт связи", "Связь", "Сеть"): [item["network"], "5G"],
+                    ("SIM-карта", "Количество SIM-карт", "Тип SIM-карты"): [item["sim"], "eSIM", "Nano-SIM", "nano SIM"],
+                    ("Разъем", "Разъём", "Интерфейс", "Порт зарядки"): [item["connector"], "USB Type-C"],
                 },
             )
             if category_id == 16:
@@ -363,13 +398,19 @@ class Command(BaseCommand):
         used_filter_ids = {item.get("filter_id") for item in filters}
         return [*filters, *[item for item in defaults if item["filter_id"] not in used_filter_ids]]
 
-    def fetch_category_attributes(self, channel, category_id):
+    def fetch_category_attributes(self, channel, category_id, timeout):
         try:
-            payload = self.send_omarket_json(channel, f"api/mia/v1/category/attribute?{urlencode({'category': category_id})}")
+            payload = self.send_omarket_json(
+                channel,
+                f"api/mia/v1/category/attribute?{urlencode({'category': category_id})}",
+                timeout=timeout,
+            )
         except (CommandError, TimeoutError) as exc:
             self.stdout.write(self.style.WARNING(f"Не удалось получить характеристики O!Market: {exc}"))
             return []
-        return payload.get("result") or []
+        attributes = payload.get("result") or []
+        self.stdout.write(self.style.SUCCESS(f"Получено характеристик O!Market для категории {category_id}: {len(attributes)}"))
+        return attributes
 
     def match_filters(self, attributes, desired_values):
         filters = []
@@ -377,9 +418,9 @@ class Command(BaseCommand):
             attribute = self.find_attribute(attributes, labels)
             if not attribute:
                 continue
-            option = self.find_option(attribute.get("values") or [], values)
+            option = self.find_option(self.attribute_options(attribute), values)
             if option:
-                filters.append({"filter_id": int(attribute["id"]), "option_id": int(option["id"])})
+                filters.append({"filter_id": int(self.object_id(attribute)), "option_id": int(self.object_id(option))})
         return filters
 
     def find_attribute(self, attributes, labels):
@@ -398,7 +439,20 @@ class Command(BaseCommand):
                 return option
         return None
 
-    def send_omarket_json(self, channel, path):
+    def attribute_options(self, attribute):
+        return attribute.get("values") or attribute.get("options") or attribute.get("filter_options") or []
+
+    def object_id(self, item):
+        return item.get("id") or item.get("filter_id") or item.get("option_id") or item.get("value_id")
+
+    def russian_color(self, color_name):
+        return {
+            "Black": ["Черный", "Чёрный"],
+            "Cosmic Orange": ["Оранжевый", "Космический оранжевый"],
+            "Deep Blue": ["Синий", "Темно-синий", "Тёмно-синий"],
+        }.get(color_name, [color_name])
+
+    def send_omarket_json(self, channel, path, timeout=30):
         url = urljoin(channel.api_url.rstrip("/") + "/", path)
         request = Request(
             url,
@@ -410,7 +464,7 @@ class Command(BaseCommand):
             method="GET",
         )
         try:
-            with urlopen(request, timeout=30) as response:
+            with urlopen(request, timeout=timeout) as response:
                 body = response.read().decode("utf-8")
         except HTTPError as exc:
             body = exc.read().decode("utf-8")
