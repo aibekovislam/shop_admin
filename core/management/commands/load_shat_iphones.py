@@ -1,6 +1,8 @@
 import json
 from decimal import Decimal
 from pathlib import Path
+from urllib.parse import urlencode, urljoin
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from django.core.files.base import ContentFile
@@ -96,7 +98,12 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument("--channel-id", type=int, help="ID канала O!Market, если adapter_key не omarketshat.")
         parser.add_argument("--adapter-key", default="omarketshat", help="Ключ адаптера канала.")
-        parser.add_argument("--category-id", type=int, default=1, help="category_id для O!Market.")
+        parser.add_argument("--category-id", type=int, default=16, help="category_id для O!Market.")
+        parser.add_argument(
+            "--category-name",
+            default="Смартфоны",
+            help="Название категории O!Market, если нужно подобрать category_id через API.",
+        )
         parser.add_argument("--quantity", type=int, default=3, help="Остаток для каждого SKU.")
         parser.add_argument("--price-17", type=Decimal, default=Decimal("79990.00"))
         parser.add_argument("--price-17-pro", type=Decimal, default=Decimal("109990.00"))
@@ -106,6 +113,8 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         channel = self.get_channel(options)
+        category_id = options["category_id"] or self.resolve_category_id(channel, options["category_name"])
+        filters_by_item = self.resolve_filters_by_item(channel, category_id)
         prices = [options["price_17"], options["price_17_pro"], options["price_17_pro_max"]]
         payload_ids = []
 
@@ -128,7 +137,7 @@ class Command(BaseCommand):
                     color.save(update_fields=["hash_code"])
 
                 product = self.upsert_product(item, category, brand, brand_category, color, memory)
-                variant = self.upsert_variant(item, product, color, memory, options["category_id"])
+                variant = self.upsert_variant(item, product, color, memory, category_id, filters_by_item[item["sku"]])
                 variants.append(variant)
                 self.upsert_stock(variant, channel.shop, options["quantity"])
                 price_obj = self.upsert_price(variant, channel, price)
@@ -185,7 +194,7 @@ class Command(BaseCommand):
         product.memories.add(memory)
         return product
 
-    def upsert_variant(self, item, product, color, memory, category_id):
+    def upsert_variant(self, item, product, color, memory, category_id, filters):
         attrs = {
             "Тип": item["model"],
             "Производители": "Apple",
@@ -200,6 +209,7 @@ class Command(BaseCommand):
             "omarket_height": item["height"],
             "omarket_length": item["length"],
             "omarket_weight": item["weight"],
+            "omarket_filters": filters,
         }
         variant, _ = ProductVariant.objects.update_or_create(
             sku=item["sku"],
@@ -250,3 +260,113 @@ class Command(BaseCommand):
         request = Request(url, headers={"User-Agent": "Mozilla/5.0"})
         with urlopen(request, timeout=30) as response:
             return ContentFile(response.read(), name=filename)
+
+    def resolve_category_id(self, channel, category_name):
+        tree = self.send_omarket_json(channel, "api/mia/v1/category/tree")
+        category = self.find_category(tree.get("result", []), category_name)
+        if not category:
+            raise CommandError(f"Категория O!Market {category_name!r} не найдена.")
+        return int(category["id"])
+
+    def find_category(self, categories, category_name):
+        normalized_name = self.normalize(category_name)
+        for category in categories:
+            if self.normalize(category.get("name")) == normalized_name:
+                return category
+            found = self.find_category(category.get("sub_categories") or [], category_name)
+            if found:
+                return found
+        return None
+
+    def resolve_filters_by_item(self, channel, category_id):
+        attributes = self.fetch_category_attributes(channel, category_id)
+        filters_by_item = {}
+        for item in IPHONES:
+            color_name, _ = item["color"]
+            filters = self.match_filters(
+                attributes,
+                {
+                    ("Состояние",): ["Новый"],
+                    ("Гаджеты", "Тип товара", "Тип"): ["Мобильные телефоны", "Смартфоны"],
+                    ("Бренд", "Производитель", "Производители"): ["Apple"],
+                    ("Модель",): [item["model"]],
+                    ("Память", "Встроенная память", "Объем памяти", "Объём памяти"): [
+                        item["memory"],
+                        item["memory"].replace("GB", " GB"),
+                    ],
+                    ("Цвет",): [color_name],
+                },
+            )
+            if category_id == 16:
+                filters = self.merge_missing_filters(
+                    filters,
+                    [
+                        {"filter_id": 1208, "option_id": 8132},
+                        {"filter_id": 677, "option_id": 7051},
+                    ],
+                )
+            filters_by_item[item["sku"]] = filters
+        return filters_by_item
+
+    def merge_missing_filters(self, filters, defaults):
+        used_filter_ids = {item.get("filter_id") for item in filters}
+        return [*filters, *[item for item in defaults if item["filter_id"] not in used_filter_ids]]
+
+    def fetch_category_attributes(self, channel, category_id):
+        try:
+            payload = self.send_omarket_json(channel, f"api/mia/v1/category/attribute?{urlencode({'category': category_id})}")
+        except CommandError as exc:
+            self.stdout.write(self.style.WARNING(f"Не удалось получить характеристики O!Market: {exc}"))
+            return []
+        return payload.get("result") or []
+
+    def match_filters(self, attributes, desired_values):
+        filters = []
+        for labels, values in desired_values.items():
+            attribute = self.find_attribute(attributes, labels)
+            if not attribute:
+                continue
+            option = self.find_option(attribute.get("values") or [], values)
+            if option:
+                filters.append({"filter_id": int(attribute["id"]), "option_id": int(option["id"])})
+        return filters
+
+    def find_attribute(self, attributes, labels):
+        normalized_labels = {self.normalize(label) for label in labels}
+        for attribute in attributes:
+            label = attribute.get("create_label") or attribute.get("name") or attribute.get("label")
+            if self.normalize(label) in normalized_labels:
+                return attribute
+        return None
+
+    def find_option(self, options, values):
+        normalized_values = {self.normalize(value) for value in values}
+        for option in options:
+            value = option.get("value") or option.get("name") or option.get("label")
+            if self.normalize(value) in normalized_values:
+                return option
+        return None
+
+    def send_omarket_json(self, channel, path):
+        url = urljoin(channel.api_url.rstrip("/") + "/", path)
+        request = Request(
+            url,
+            headers={
+                "X-Access-Token": channel.api_token,
+                "Accept": "application/json",
+                "User-Agent": "ShopAdminOMarketImporter/1.0",
+            },
+            method="GET",
+        )
+        try:
+            with urlopen(request, timeout=30) as response:
+                body = response.read().decode("utf-8")
+        except HTTPError as exc:
+            body = exc.read().decode("utf-8")
+            raise CommandError(f"O!Market GET {url} вернул {exc.code}: {body}") from exc
+        except URLError as exc:
+            raise CommandError(f"O!Market GET {url} недоступен: {exc.reason}") from exc
+        return json.loads(body) if body else {}
+
+    def normalize(self, value):
+        return str(value or "").strip().casefold().replace("ё", "е")

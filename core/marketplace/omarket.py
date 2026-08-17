@@ -96,6 +96,7 @@ class OMarketAdapter(MarketplaceAdapter):
                     float(price.discount_amount) if price.discount_amount else None
                 ),
                 "attributes": attrs.get("omarket_attributes"),
+                "filters": attrs.get("omarket_filters"),
             }
             for key, value in optional_fields.items():
                 if value not in (None, "", []):
@@ -139,6 +140,9 @@ class OMarketAdapter(MarketplaceAdapter):
         omarket_attributes = attrs.get("omarket_attributes")
         if omarket_attributes not in (None, "") and not isinstance(omarket_attributes, list):
             errors.append("omarket_attributes должен быть списком")
+        omarket_filters = attrs.get("omarket_filters")
+        if omarket_filters not in (None, "") and not isinstance(omarket_filters, list):
+            errors.append("omarket_filters должен быть списком")
         return errors
 
     def push_products(self, channel_price_ids=None):
