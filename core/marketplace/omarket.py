@@ -96,7 +96,6 @@ class OMarketAdapter(MarketplaceAdapter):
                     float(price.discount_amount) if price.discount_amount else None
                 ),
                 "attributes": attrs.get("omarket_attributes"),
-                "filters": attrs.get("omarket_filters"),
             }
             for key, value in optional_fields.items():
                 if value not in (None, "", []):

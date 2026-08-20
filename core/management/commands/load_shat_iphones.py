@@ -45,8 +45,12 @@ IPHONES = [
         "network": "5G",
         "connector": "USB-C",
         "chip": "A19",
+        "chip_values": ["A19", "Apple A19"],
+        "cores": "6",
         "camera": "48MP Dual Fusion: Main + Ultra Wide, 18MP Center Stage front camera",
+        "camera_values": ["48 МП", "48MP", "48MP Dual Fusion"],
         "battery": "Video playback up to 30 hours",
+        "authenticity": "Оригинал",
         "omarket_static_filters": {
             4072: 66602,
             4079: 66618,
@@ -76,8 +80,12 @@ IPHONES = [
         "network": "5G",
         "connector": "USB-C",
         "chip": "A19 Pro",
+        "chip_values": ["A19 Pro", "Apple A19 Pro"],
+        "cores": "6",
         "camera": "48MP Pro Fusion: Main, Ultra Wide, Telephoto, up to 8x optical-quality zoom",
+        "camera_values": ["48 МП", "48MP", "48MP Pro Fusion"],
         "battery": "Video playback up to 33 hours",
+        "authenticity": "Оригинал",
         "omarket_static_filters": {
             4072: 66592,
             4079: 66619,
@@ -107,8 +115,12 @@ IPHONES = [
         "network": "5G",
         "connector": "USB-C",
         "chip": "A19 Pro",
+        "chip_values": ["A19 Pro", "Apple A19 Pro"],
+        "cores": "6",
         "camera": "48MP Pro Fusion: Main, Ultra Wide, Telephoto, up to 8x optical-quality zoom",
+        "camera_values": ["48 МП", "48MP", "48MP Pro Fusion"],
         "battery": "Video playback up to 39 hours",
+        "authenticity": "Оригинал",
         "omarket_static_filters": {
             4072: 66600,
             4079: 66619,
@@ -137,12 +149,24 @@ IPHONES = [
         "network": "5G",
         "connector": "USB-C",
         "chip": "A18 Pro",
+        "chip_values": ["A18 Pro", "Apple A18 Pro"],
+        "cores": "6",
         "camera": "48MP Fusion Main + 48MP Ultra Wide + 12MP Telephoto, 12MP front camera",
+        "camera_values": ["48 МП", "48MP", "48MP Fusion"],
         "battery": "Video playback up to 33 hours",
+        "authenticity": "Оригинал",
         "omarket_static_filters": {
             4072: 66602,
             4079: 66619,
             2081: 74800,
+            2021: 80331,
+            2141: 80410,
+            2142: 11064,
+            2101: 10997,
+            2103: 80370,
+            2104: 11025,
+            2121: 74802,
+            2102: 11000,
         },
         "image_urls": [
             "https://www.apple.com/v/iphone/compare/ai/images/overview/compare_iphone16_pro_max_black_titanium__etrij8y98ga6_large_2x.jpg",
@@ -196,7 +220,11 @@ class Command(BaseCommand):
             attributes = self.fetch_category_attributes(channel, category_id, options["attribute_timeout"])
             self.stdout.write(json.dumps(self.serialize_attributes(attributes), ensure_ascii=False, indent=2))
             return
-        filters_by_item = self.resolve_filters_by_item(channel, category_id, options["attribute_timeout"])
+        omarket_attributes_by_item = self.resolve_omarket_attributes_by_item(
+            channel,
+            category_id,
+            options["attribute_timeout"],
+        )
         prices = [
             options["price_17"],
             options["price_17_pro"],
@@ -224,7 +252,14 @@ class Command(BaseCommand):
                     color.save(update_fields=["hash_code"])
 
                 product = self.upsert_product(item, category, brand, brand_category, color, memory)
-                variant = self.upsert_variant(item, product, color, memory, category_id, filters_by_item[item["sku"]])
+                variant = self.upsert_variant(
+                    item,
+                    product,
+                    color,
+                    memory,
+                    category_id,
+                    omarket_attributes_by_item[item["sku"]],
+                )
                 variants.append(variant)
                 self.upsert_stock(variant, channel.shop, options["quantity"])
                 price_obj = self.upsert_price(variant, channel, price)
@@ -233,7 +268,7 @@ class Command(BaseCommand):
                     self.ensure_images(variant, item)
 
             if not options["keep_old_skus"]:
-                payload_ids.extend(self.deactivate_legacy_skus(channel, category_id, filters_by_item))
+                payload_ids.extend(self.deactivate_legacy_skus(channel, category_id, omarket_attributes_by_item))
 
             similar_skus = [variant.sku for variant in variants]
             for variant in variants:
@@ -285,7 +320,7 @@ class Command(BaseCommand):
         product.memories.add(memory)
         return product
 
-    def upsert_variant(self, item, product, color, memory, category_id, filters):
+    def upsert_variant(self, item, product, color, memory, category_id, omarket_attributes):
         attrs = {
             "Тип": item["model"],
             "Производители": "Apple",
@@ -300,8 +335,7 @@ class Command(BaseCommand):
             "omarket_height": item["height"],
             "omarket_length": item["length"],
             "omarket_weight": item["weight"],
-            "omarket_filters": filters,
-            "omarket_attributes": self.omarket_attributes_from_filters(filters),
+            "omarket_attributes": omarket_attributes,
         }
         variant, _ = ProductVariant.objects.update_or_create(
             sku=item["sku"],
@@ -335,7 +369,7 @@ class Command(BaseCommand):
         )
         return price_obj
 
-    def deactivate_legacy_skus(self, channel, category_id, filters_by_item):
+    def deactivate_legacy_skus(self, channel, category_id, omarket_attributes_by_item):
         price_ids = []
         for item in IPHONES:
             legacy_sku = item.get("legacy_sku")
@@ -352,10 +386,10 @@ class Command(BaseCommand):
                     "omarket_height": item["height"],
                     "omarket_length": item["length"],
                     "omarket_weight": item["weight"],
-                    "omarket_filters": filters_by_item[item["sku"]],
-                    "omarket_attributes": self.omarket_attributes_from_filters(filters_by_item[item["sku"]]),
+                    "omarket_attributes": omarket_attributes_by_item[item["sku"]],
                 }
             )
+            legacy_attrs.pop("omarket_filters", None)
             legacy_variant.attributes = legacy_attrs
             legacy_variant.save(update_fields=["attributes"])
             self.upsert_stock(legacy_variant, channel.shop, 0)
@@ -418,53 +452,70 @@ class Command(BaseCommand):
                 return found
         return None
 
-    def resolve_filters_by_item(self, channel, category_id, timeout):
+    def resolve_omarket_attributes_by_item(self, channel, category_id, timeout):
         attributes = self.fetch_category_attributes(channel, category_id, timeout)
-        filters_by_item = {}
+        attributes_by_item = {}
         for item in IPHONES:
             color_name, _ = item["color"]
-            filters = self.match_filters(
+            desired_values = {
+                ("Состояние",): ["Новый"],
+                ("Гаджеты", "Тип товара", "Тип"): ["Мобильные телефоны", "Смартфоны", "Моноблок (классический)"],
+                ("Бренд", "Производитель", "Производители"): ["Apple"],
+                ("Модель", "Линейка", "Серия"): [item["model"]],
+                (
+                    "Память",
+                    "Встроенная память",
+                    "Объем встроенной памяти",
+                    "Объём встроенной памяти",
+                    "Объем памяти",
+                    "Объём памяти",
+                    "Объем памяти, ГБ",
+                ): [
+                    item["memory"],
+                    item["memory"].replace("GB", " GB"),
+                    item["memory"].replace("GB", " ГБ"),
+                    item["memory"].replace("GB", "Gb"),
+                ],
+                ("Цвет", "Цвет товара"): [color_name, *self.russian_color(color_name)],
+                ("Диагональ", "Диагональ экрана", "Диагональ экрана, дюйм", "Размер экрана"): [
+                    item["screen_size"],
+                    f"{item['screen_size']} дюйм",
+                    f"{item['screen_size']} дюймов",
+                    f"{item['screen_size']}\"",
+                    f"{item['screen_size']}″",
+                ],
+                ("Матрица экрана", "Тип матрицы", "Тип экрана", "Экран", "Дисплей"): [
+                    "OLED",
+                    "Super Retina XDR",
+                    "Super Retina XDR OLED",
+                ],
+                ("Операционная система", "ОС"): [item["os"], "iOS"],
+                ("Процессор", "Чип", "Чипсет"): item["chip_values"],
+                ("Количество ядер", "Ядра", "Кол-во ядер"): [item["cores"]],
+                ("Камера", "Основная камера"): item["camera_values"],
+                ("Подлинность",): [item["authenticity"], "Original"],
+                ("Стандарт связи", "Связь", "Сеть"): [item["network"], "5G"],
+                ("SIM-карта", "Количество SIM-карт", "Тип SIM-карты"): [item["sim"], "eSIM", "Nano-SIM", "nano SIM"],
+                ("Разъем", "Разъём", "Интерфейс", "Порт зарядки"): [item["connector"], "USB Type-C"],
+            }
+            omarket_attributes = self.match_omarket_attributes(
                 attributes,
-                {
-                    ("Состояние",): ["Новый"],
-                    ("Гаджеты", "Тип товара", "Тип"): ["Мобильные телефоны", "Смартфоны"],
-                    ("Бренд", "Производитель", "Производители"): ["Apple"],
-                    ("Модель", "Линейка", "Серия"): [item["model"]],
-                    ("Память", "Встроенная память", "Объем встроенной памяти", "Объём встроенной памяти", "Объем памяти", "Объём памяти"): [
-                        item["memory"],
-                        item["memory"].replace("GB", " GB"),
-                        item["memory"].replace("GB", " ГБ"),
-                        item["memory"].replace("GB", "Gb"),
-                    ],
-                    ("Цвет", "Цвет товара"): [color_name, *self.russian_color(color_name)],
-                    ("Диагональ", "Диагональ экрана", "Размер экрана"): [
-                        item["screen_size"],
-                        f"{item['screen_size']} дюйм",
-                        f"{item['screen_size']} дюймов",
-                        f"{item['screen_size']}\"",
-                    ],
-                    ("Операционная система", "ОС"): [item["os"], "iOS"],
-                    ("Процессор", "Чип", "Чипсет"): [item["chip"]],
-                    ("Тип матрицы", "Тип экрана", "Экран", "Дисплей"): ["OLED", "Super Retina XDR", "Super Retina XDR OLED"],
-                    ("Стандарт связи", "Связь", "Сеть"): [item["network"], "5G"],
-                    ("SIM-карта", "Количество SIM-карт", "Тип SIM-карты"): [item["sim"], "eSIM", "Nano-SIM", "nano SIM"],
-                    ("Разъем", "Разъём", "Интерфейс", "Порт зарядки"): [item["connector"], "USB Type-C"],
-                },
+                desired_values,
             )
             if category_id == 16:
-                filters = self.merge_missing_filters(
-                    filters,
-                    self.static_smartphone_filters(item),
+                omarket_attributes = self.merge_missing_omarket_attributes(
+                    omarket_attributes,
+                    self.static_smartphone_attributes(item),
                 )
-            filters_by_item[item["sku"]] = filters
-        return filters_by_item
+            attributes_by_item[item["sku"]] = omarket_attributes
+        return attributes_by_item
 
-    def merge_missing_filters(self, filters, defaults):
-        used_filter_ids = {item.get("filter_id") for item in filters}
-        return [*filters, *[item for item in defaults if item["filter_id"] not in used_filter_ids]]
+    def merge_missing_omarket_attributes(self, attributes, defaults):
+        used_attribute_ids = {item.get("attribute_id") for item in attributes}
+        return [*attributes, *[item for item in defaults if item["attribute_id"] not in used_attribute_ids]]
 
-    def static_smartphone_filters(self, item):
-        filters = {
+    def static_smartphone_attributes(self, item):
+        attributes = {
             606: 2781,  # Бренд смартфоны: Apple
             4070: 66575,  # Объем встроенной памяти смартфоны: 256 ГБ
             4071: 66578,  # Поддержка 5G смартфоны: да
@@ -484,14 +535,7 @@ class Command(BaseCommand):
             2041: 10913,  # Техническое состояние смартфоны: Идеальное
             **item["omarket_static_filters"],
         }
-        return [{"filter_id": filter_id, "option_id": option_id} for filter_id, option_id in filters.items()]
-
-    def omarket_attributes_from_filters(self, filters):
-        return [
-            {"attribute_id": item["filter_id"], "value_id": item["option_id"]}
-            for item in filters
-            if item.get("filter_id") and item.get("option_id")
-        ]
+        return [{"attribute_id": attribute_id, "value_id": value_id} for attribute_id, value_id in attributes.items()]
 
     def fetch_category_attributes(self, channel, category_id, timeout):
         try:
@@ -507,18 +551,43 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(f"Получено характеристик O!Market для категории {category_id}: {len(attributes)}"))
         return attributes
 
-    def match_filters(self, attributes, desired_values):
-        filters = []
-        for labels, values in desired_values.items():
-            attribute = self.find_attribute(attributes, labels)
-            if not attribute:
+    def match_omarket_attributes(self, attributes, desired_values):
+        selected = []
+        selected_attribute_ids = set()
+        self.match_omarket_attributes_recursive(attributes, desired_values, selected, selected_attribute_ids)
+        return selected
+
+    def match_omarket_attributes_recursive(self, attributes, desired_values, selected, selected_attribute_ids):
+        for attribute in attributes or []:
+            match = self.desired_values_for_attribute(attribute, desired_values)
+            if not match:
                 continue
-            option = self.find_option(self.attribute_options(attribute), values)
-            if option:
-                filter_item = {"filter_id": int(self.object_id(attribute)), "option_id": int(self.object_id(option))}
-                if filter_item not in filters:
-                    filters.append(filter_item)
-        return filters
+            option = self.find_option(self.attribute_options(attribute), match)
+            if not option:
+                continue
+            attribute_id = int(self.object_id(attribute))
+            if attribute_id not in selected_attribute_ids:
+                selected.append({"attribute_id": attribute_id, "value_id": int(self.object_id(option))})
+                selected_attribute_ids.add(attribute_id)
+            self.match_omarket_attributes_recursive(
+                option.get("attributes") or [],
+                desired_values,
+                selected,
+                selected_attribute_ids,
+            )
+
+    def desired_values_for_attribute(self, attribute, desired_values):
+        label = attribute.get("create_label") or attribute.get("name") or attribute.get("label")
+        normalized_label = self.normalize_search(label)
+        for labels, values in desired_values.items():
+            normalized_labels = {self.normalize_search(item) for item in labels}
+            if normalized_label in normalized_labels:
+                return values
+        for labels, values in desired_values.items():
+            normalized_labels = {self.normalize_search(item) for item in labels}
+            if any(self.safe_contains(normalized_label, expected) for expected in normalized_labels):
+                return values
+        return None
 
     def find_attribute(self, attributes, labels):
         normalized_labels = {self.normalize_search(label) for label in labels}
