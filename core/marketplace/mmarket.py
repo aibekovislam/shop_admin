@@ -192,7 +192,9 @@ class MMarketAdapter(MarketplaceAdapter):
         if len(images) < 3:
             errors.append("нужно минимум 3 фото")
         invalid_images = [
-            image_url for image_url in images if not urlparse(image_url).path.lower().endswith((".jpg", ".png", ".webp"))
+            image_url
+            for image_url in images
+            if not urlparse(image_url).path.lower().endswith((".jpg", ".jpeg", ".png", ".webp"))
         ]
         if invalid_images:
             errors.append("фото должны быть прямыми ссылками .jpg, .png или .webp")
