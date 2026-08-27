@@ -72,10 +72,11 @@ class OMarketAdapter(MarketplaceAdapter):
             if product_errors:
                 errors.append(f"{variant.sku}: {', '.join(product_errors)}")
                 continue
+            title = attrs.get("omarket_title") or product_model.name
 
             item = {
                 "sku": variant.sku,
-                "title": product_model.name,
+                "title": title,
                 "description": product_model.description or "",
                 "category_id": int(attrs["omarket_category_id"]),
                 "price": float(price.price),
@@ -112,9 +113,10 @@ class OMarketAdapter(MarketplaceAdapter):
 
     def validate_product(self, product, variant, attrs, images):
         errors = []
+        title = attrs.get("omarket_title") or product.name
         if not variant.sku or len(variant.sku) > 50:
             errors.append("SKU обязателен и должен быть до 50 символов")
-        if not product.name or len(product.name) > 100:
+        if not title or len(title) > 100:
             errors.append("название обязательно и должно быть до 100 символов")
         if len(product.description or "") > 1000:
             errors.append("описание должно быть до 1000 символов")
