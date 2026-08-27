@@ -1,16 +1,22 @@
 import json
 import re
 from decimal import Decimal
+from io import BytesIO
 from pathlib import Path
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode, urljoin
+from urllib.parse import urlencode, urljoin, urlparse
 from urllib.request import Request, urlopen
 
+from django.core.files.base import ContentFile
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
+from PIL import Image
 
 from core.marketplace.factory import get_marketplace_adapter
 from core.models import Channel, ChannelPrice, ProductVariant
+
+
+ALLOWED_OMARKET_IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png"}
 
 
 CATEGORY_CANDIDATES = {
@@ -106,6 +112,11 @@ class Command(BaseCommand):
                     continue
                 if len(variant.sku) > 50:
                     skipped.append((variant.sku, "SKU длиннее 50 символов, O!Market не примет"))
+                    continue
+                try:
+                    self.ensure_omarket_image_extensions(variant)
+                except CommandError as exc:
+                    skipped.append((variant.sku, str(exc)))
                     continue
 
                 attrs = dict(variant.attributes or {})
@@ -229,6 +240,27 @@ class Command(BaseCommand):
         if stock and stock.marketplace_quantity <= 0:
             return "нулевой остаток"
         return ""
+
+    def ensure_omarket_image_extensions(self, variant):
+        images = list(variant.images.all())
+        if not images:
+            raise CommandError("нет фото")
+        for image in images:
+            suffix = Path(urlparse(image.image.name).path).suffix.lower()
+            if suffix in ALLOWED_OMARKET_IMAGE_SUFFIXES:
+                continue
+            try:
+                image.image.open("rb")
+                source_image = Image.open(image.image).convert("RGBA")
+            except OSError as exc:
+                raise CommandError(f"не удалось открыть фото для конвертации: {exc}") from exc
+            canvas = Image.new("RGBA", source_image.size, "WHITE")
+            canvas.alpha_composite(source_image)
+            output = BytesIO()
+            canvas.convert("RGB").save(output, format="JPEG", quality=92, optimize=True)
+            new_name = f"{Path(image.image.name).stem}.jpg"
+            image.image.save(new_name, ContentFile(output.getvalue()), save=False)
+            image.save(update_fields=["image"])
 
     def resolve_category_ids(self, channel, tree):
         category_ids = {"Смартфоны": 16}
