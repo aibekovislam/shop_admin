@@ -291,7 +291,16 @@ class Command(BaseCommand):
     def omarket_attributes(self, channel, attrs_cache, category_id, variant, allow_fetch):
         cached_attrs = attrs_cache.get(str(category_id))
         if cached_attrs is None and allow_fetch:
-            cached_attrs = self.fetch_category_attributes(channel, category_id)
+            try:
+                cached_attrs = self.fetch_category_attributes(channel, category_id)
+            except CommandError as exc:
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"Не удалось получить attrs O!Market для category_id={category_id}: {exc}. "
+                        "Продолжаю без omarket_attributes."
+                    )
+                )
+                cached_attrs = []
             attrs_cache[str(category_id)] = cached_attrs
         desired = self.desired_values(variant)
         matched = self.match_omarket_attributes(cached_attrs or [], desired)
