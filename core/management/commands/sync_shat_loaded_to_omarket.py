@@ -30,6 +30,12 @@ CATEGORY_CANDIDATES = {
     "Умные весы": ["Напольные весы", "Умные весы", "Весы"],
     "Велоаксессуары": ["Велоаксессуары", "Аксессуары для велосипеда"],
     "Автоэлектроника": ["Видеорегистраторы", "Автоэлектроника"],
+    "Поисковые метки": ["Поисковые метки", "Трекеры", "Метки", "GPS-трекеры", "Аксессуары"],
+    "Аксессуары": ["Аксессуары", "Аксессуары для телефонов", "Кабели и адаптеры", "Зарядные устройства"],
+    "Ноутбуки": ["Ноутбуки", "Ноутбуки и ультрабуки"],
+    "Компьютеры": ["Настольные компьютеры", "Компьютеры", "Моноблоки", "Мини-ПК"],
+    "Умные колонки": ["Умные колонки", "Портативная акустика", "Колонки", "Акустика"],
+    "Очистители воздуха": ["Очистители воздуха", "Климатическая техника", "Очистители и увлажнители воздуха"],
 }
 
 
@@ -207,7 +213,7 @@ class Command(BaseCommand):
             prices = prices.filter(variant__product__category__in=categories)
         else:
             prices = prices.filter(
-                variant__product__brand_name__in=["Apple", "Garmin"],
+                variant__product__brand_name__in=["Apple", "Garmin", "Xiaomi", "POCO", "Huawei", "Яндекс"],
                 variant__product__category__in=[
                     "Смартфоны",
                     "Планшеты",
@@ -219,6 +225,12 @@ class Command(BaseCommand):
                     "Умные весы",
                     "Велоаксессуары",
                     "Автоэлектроника",
+                    "Поисковые метки",
+                    "Аксессуары",
+                    "Ноутбуки",
+                    "Компьютеры",
+                    "Умные колонки",
+                    "Очистители воздуха",
                 ],
             )
         return list(prices)
@@ -304,6 +316,23 @@ class Command(BaseCommand):
             return {"omarket_width": 35, "omarket_height": 35, "omarket_length": 5, "omarket_weight": 2.5}
         if category == "Автоэлектроника":
             return {"omarket_width": 12, "omarket_height": 10, "omarket_length": 8, "omarket_weight": 0.6}
+        if category == "Поисковые метки":
+            return {"omarket_width": 8, "omarket_height": 8, "omarket_length": 3, "omarket_weight": 0.15}
+        if category == "Аксессуары":
+            return {"omarket_width": 12, "omarket_height": 10, "omarket_length": 4, "omarket_weight": 0.3}
+        if category == "Ноутбуки":
+            return {"omarket_width": 38, "omarket_height": 28, "omarket_length": 8, "omarket_weight": 2.5}
+        if category == "Компьютеры":
+            product_name = variant.product.name.lower()
+            if "imac" in product_name or "iMac" in variant.product.name:
+                return {"omarket_width": 65, "omarket_height": 50, "omarket_length": 20, "omarket_weight": 7.0}
+            if "mac mini" in product_name:
+                return {"omarket_width": 20, "omarket_height": 20, "omarket_length": 10, "omarket_weight": 1.5}
+            return {"omarket_width": 45, "omarket_height": 35, "omarket_length": 20, "omarket_weight": 4.0}
+        if category == "Умные колонки":
+            return {"omarket_width": 25, "omarket_height": 25, "omarket_length": 25, "omarket_weight": 3.0}
+        if category == "Очистители воздуха":
+            return {"omarket_width": 35, "omarket_height": 65, "omarket_length": 35, "omarket_weight": 6.0}
         if category in {"Велоаксессуары", "Спортивные аксессуары"}:
             return {"omarket_width": 18, "omarket_height": 12, "omarket_length": 8, "omarket_weight": 0.5}
         return {"omarket_width": 10, "omarket_height": 10, "omarket_length": 7, "omarket_weight": 0.35}
@@ -368,6 +397,9 @@ class Command(BaseCommand):
             ("Операционная система", "ОС"): [attrs.get("Операционная система"), "iOS" if brand == "Apple" else ""],
             ("Разъем", "Разъём", "Интерфейс", "Порт зарядки"): [attrs.get("Разъем"), "USB-C", "USB Type-C"],
             ("Bluetooth", "Беспроводная связь"): [attrs.get("Беспроводная связь"), "Bluetooth"],
+            ("Материал корпуса", "Материал"): [attrs.get("Материал корпуса"), attrs.get("Материал")],
+            ("Диагональ экрана", "Диагональ"): [attrs.get("Диагональ экрана"), attrs.get("Экран")],
+            ("Процессор", "Чип"): [attrs.get("Процессор"), attrs.get("Чип")],
             ("Шумоподавление", "Активное шумоподавление"): ["Да", "Есть"] if "ANC" in variant.product.name.upper() else [],
         }
         return {labels: [value for value in candidates if value] for labels, candidates in values.items()}
