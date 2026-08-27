@@ -1,6 +1,7 @@
 from collections import OrderedDict
 from decimal import Decimal, ROUND_HALF_UP
 import json
+from pathlib import Path
 from pathlib import PurePosixPath
 from urllib.parse import urlparse
 
@@ -187,7 +188,7 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument(
             "--excel",
-            default="/Users/islamaibekov/Downloads/Price Turan .xlsx",
+            default="Price Turan .xlsx",
             help="Путь к Excel-файлу с остатками Turan.",
         )
         parser.add_argument("--channel-id", type=int, help="ID канала M-Market.")
@@ -253,7 +254,7 @@ class Command(BaseCommand):
         return channel
 
     def read_airpods(self, path):
-        workbook = load_workbook(path, data_only=True)
+        workbook = load_workbook(self.resolve_excel_path(path), data_only=True)
         sheet = workbook.active
         rows = OrderedDict()
         for row in sheet.iter_rows(values_only=True):
@@ -269,6 +270,24 @@ class Command(BaseCommand):
             entry["quantity"] += quantity
             entry["usd"] = max(entry["usd"], usd)
         return rows
+
+    def resolve_excel_path(self, path):
+        original_path = Path(path)
+        candidates = [original_path]
+        if not original_path.is_absolute():
+            candidates.extend(
+                [
+                    Path.cwd() / original_path,
+                    Path("/app") / original_path,
+                    Path("/app/imports") / original_path,
+                    Path("/tmp") / original_path,
+                ]
+            )
+        for candidate in candidates:
+            if candidate.exists():
+                return candidate
+        checked = ", ".join(str(candidate) for candidate in candidates)
+        raise CommandError(f"Excel-файл не найден. Проверенные пути: {checked}")
 
     def normalize_excel_name(self, value):
         return " ".join(str(value).upper().replace("Б/У", "B/U").replace("Б.У", "B/U").split())
