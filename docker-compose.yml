@@ -46,5 +46,16 @@ services:
       - db
       - redis
 
+  celery-beat:
+    build: .
+    command: celery -A config beat -l info --schedule=/tmp/celerybeat-schedule
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    depends_on:
+      - db
+      - redis
+
 volumes:
   postgres_data:

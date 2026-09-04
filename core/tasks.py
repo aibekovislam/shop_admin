@@ -2,6 +2,7 @@ from celery import shared_task
 
 from core.models import Channel
 from core.marketplace.factory import get_marketplace_adapter
+from core.marketplace.sync import sync_shat_marketplaces
 
 
 
@@ -34,3 +35,8 @@ def sync_marketplace_products(self, channel_id):
         raise self.retry(
             exc=exc
         )
+
+
+@shared_task
+def sync_shat_marketplaces_hourly():
+    return sync_shat_marketplaces()

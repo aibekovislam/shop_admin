@@ -99,6 +99,13 @@ CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
+CELERY_BEAT_SCHEDULE = {
+    "sync-shat-marketplaces-hourly": {
+        "task": "core.tasks.sync_shat_marketplaces_hourly",
+        "schedule": 60 * 60,
+    },
+}
+SHAT_MARKET_CHANNEL_IDS = env.list("SHAT_MARKET_CHANNEL_IDS", default=[])
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
