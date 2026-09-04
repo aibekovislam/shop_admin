@@ -65,8 +65,8 @@ PRODUCT = {
     },
     "image_urls": [
         "https://www.apple.com/v/airpods-max/k/images/specs/hero_purple__skk4zesfid6y_large.jpg",
-        "https://www.apple.com/v/airpods-max/k/images/specs/airpods_front__bwbxvilb50eq_large.jpg",
-        "https://www.apple.com/v/airpods-max/k/images/specs/airpods_side__fsa2bfynojmi_large.jpg",
+        "https://images.biggeek.ru/1/870/5fa9/28397-67purple_new%402x.jpg",
+        "https://service.pcconnection.com/images/inhouse/FA53D5FE-F8E3-4B06-B7C2-53979A6C462A.jpg",
     ],
 }
 
