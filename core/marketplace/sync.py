@@ -10,18 +10,28 @@ from core.models import Channel, ChannelPrice
 
 logger = logging.getLogger(__name__)
 
-SHAT_MARKET_ADAPTER_KEYS = ("mmarket", "omarketshat", "bakai")
+MARKET_ADAPTER_KEYS = ("mmarket", "omarket", "omarketshat", "bakai")
 SHAT_MMARKET_BRANCH_IDS = (677,)
 DEFAULT_BATCH_SIZES = {
     "mmarket": 5000,
+    "omarket": 100,
     "omarketshat": 100,
     "bakai": 1000,
 }
 
 
 def sync_shat_marketplaces(channel_ids=None, dry_run=False):
-    channels = list_shat_market_channels(channel_ids)
+    return sync_named_marketplaces("SHAT", channel_ids=channel_ids, dry_run=dry_run)
+
+
+def sync_turan_marketplaces(channel_ids=None, dry_run=False):
+    return sync_named_marketplaces("TURAN", channel_ids=channel_ids, dry_run=dry_run)
+
+
+def sync_named_marketplaces(market_name, channel_ids=None, dry_run=False):
+    channels = list_named_market_channels(market_name, channel_ids)
     result = {
+        "market": market_name,
         "dry_run": dry_run,
         "channels": [],
         "total_sent": 0,
@@ -30,7 +40,7 @@ def sync_shat_marketplaces(channel_ids=None, dry_run=False):
     }
 
     for channel in channels:
-        channel_result = sync_channel(channel, dry_run=dry_run)
+        channel_result = sync_channel(channel, market_name=market_name, dry_run=dry_run)
         result["channels"].append(channel_result)
         result["total_sent"] += channel_result["sent"]
         result["total_skipped"] += channel_result["skipped"]
@@ -40,26 +50,34 @@ def sync_shat_marketplaces(channel_ids=None, dry_run=False):
 
 
 def list_shat_market_channels(channel_ids=None):
-    configured_ids = parse_ids(channel_ids if channel_ids is not None else getattr(settings, "SHAT_MARKET_CHANNEL_IDS", []))
+    return list_named_market_channels("SHAT", channel_ids)
+
+
+def list_turan_market_channels(channel_ids=None):
+    return list_named_market_channels("TURAN", channel_ids)
+
+
+def list_named_market_channels(market_name, channel_ids=None):
+    settings_name = f"{market_name.upper()}_MARKET_CHANNEL_IDS"
+    configured_ids = parse_ids(channel_ids if channel_ids is not None else getattr(settings, settings_name, []))
     if configured_ids:
         return Channel.objects.filter(id__in=configured_ids, is_active=True).order_by("id")
 
+    market_filter = Q(name__icontains=market_name) | Q(shop__name__icontains=market_name)
+    if market_name.upper() == "SHAT":
+        market_filter |= Q(adapter_key="mmarket", branch_id__in=SHAT_MMARKET_BRANCH_IDS)
+
     return (
         Channel.objects.filter(
-            adapter_key__in=SHAT_MARKET_ADAPTER_KEYS,
+            adapter_key__in=MARKET_ADAPTER_KEYS,
             is_active=True,
         )
-        .filter(
-            Q(adapter_key__in=("omarketshat", "bakai"))
-            | Q(name__icontains="SHAT")
-            | Q(shop__name__icontains="SHAT")
-            | Q(adapter_key="mmarket", branch_id__in=SHAT_MMARKET_BRANCH_IDS)
-        )
+        .filter(market_filter)
         .order_by("id")
     )
 
 
-def sync_channel(channel, dry_run=False):
+def sync_channel(channel, market_name="", dry_run=False):
     price_ids, skipped = eligible_channel_price_ids(channel)
     channel_result = {
         "channel_id": channel.id,
@@ -95,7 +113,7 @@ def sync_channel(channel, dry_run=False):
             channel_result["sent"] += batch_result["sent"]
         except Exception as exc:
             message = f"{channel.name} batch {index}: {exc}"
-            logger.exception("SHAT marketplace sync failed: %s", message)
+            logger.exception("%s marketplace sync failed: %s", market_name or channel.name, message)
             batch_result["error"] = str(exc)
             channel_result["errors"].append(message)
             if not dry_run:

@@ -104,8 +104,13 @@ CELERY_BEAT_SCHEDULE = {
         "task": "core.tasks.sync_shat_marketplaces_hourly",
         "schedule": 60 * 60,
     },
+    "sync-turan-marketplaces-hourly": {
+        "task": "core.tasks.sync_turan_marketplaces_hourly",
+        "schedule": 60 * 60,
+    },
 }
 SHAT_MARKET_CHANNEL_IDS = env.list("SHAT_MARKET_CHANNEL_IDS", default=[])
+TURAN_MARKET_CHANNEL_IDS = env.list("TURAN_MARKET_CHANNEL_IDS", default=[])
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
