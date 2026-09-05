@@ -4,6 +4,28 @@ from core.marketplace.catalog_attributes import has_brand_dependencies, match_at
 
 
 class CatalogAttributesTests(TestCase):
+    def test_numeric_memory_options_accept_english_units(self):
+        selected, missing = match_attributes([
+            {"id": 2, "label": "Объем памяти", "values": [{"id": 21, "value": "256"}]},
+            {"id": 3, "label": "ОЗУ", "values": [{"id": 31, "value": "8"}]},
+        ], {"Память": "256GB", "Оперативная память": "8 gb"})
+        self.assertEqual(selected, [{"attribute_id": 2, "value_id": 21}, {"attribute_id": 3, "value_id": 31}])
+        self.assertEqual(missing, [])
+
+    def test_schema_export_unwraps_categories(self):
+        self.assertEqual(parse_attrs_document(
+            '{"category_paths":{"16":"Phones"},"attributes":{"16":[]},"errors":{}}'
+        ), {"16": []})
+
+    def test_incomplete_or_malformed_schema_is_rejected(self):
+        for document in (
+            '{"category_paths":{},"attributes":{"16":[]},"errors":{"16":"Failed"}}',
+            '{"16":{}}',
+            '{"category_paths":{},"attributes":[],"errors":{}}',
+        ):
+            with self.subTest(document=document), self.assertRaises(ValueError):
+                parse_attrs_document(document)
+
     def test_selected_brand_branch_only(self):
         nodes = [{"id": 606, "label": "Бренд смартфоны", "values": [
             {"id": 2781, "value": "Apple", "attributes": [

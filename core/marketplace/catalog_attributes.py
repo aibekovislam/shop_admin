@@ -43,6 +43,15 @@ def parse_attrs_document(text):
         return {"16": data}
     if not isinstance(data, dict):
         raise ValueError("Ожидается словарь category_id или список атрибутов")
+    if "attributes" in data and "category_paths" in data:
+        if data.get("errors"):
+            raise ValueError("Экспорт схемы содержит ошибки; требуется полный успешный экспорт")
+        data = data["attributes"]
+    if not isinstance(data, dict) or any(
+        not str(key).isdigit() or not isinstance(value, list)
+        for key, value in data.items()
+    ):
+        raise ValueError("Ожидается словарь category_id со списками атрибутов")
     return data
 
 
@@ -62,7 +71,7 @@ def match_attributes(attributes, specs):
                 continue
             candidates = {normalize(value)}
             if key in {label_key("Память"), label_key("Оперативная память")}:
-                candidates.add(normalize(re.sub(r"\s*ГБ$", "", value, flags=re.I)))
+                candidates.add(normalize(re.sub(r"\s*(?:ГБ|GB)$", "", value, flags=re.I)))
             options = attribute.get("values") or attribute.get("options") or []
             found = [option for option in options if normalize(option.get("value") or option.get("name") or "") in candidates]
             if len(found) != 1:
