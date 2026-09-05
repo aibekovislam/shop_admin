@@ -4,6 +4,8 @@ from collections import defaultdict
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 import re
 import unicodedata
+from pathlib import Path
+import json
 
 from openpyxl import load_workbook
 
@@ -136,3 +138,28 @@ def audit_catalog(stock_path, price_path, sheet="Остатки на 04.09.2026"
         },
         "items": items, "excluded": excluded,
     }
+
+
+def fill_web_prices(audit, path=None):
+    path = Path(path) if path else Path(__file__).parent / "catalog_data" / "turan_web_prices.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    offers = {}
+    for offer in data["offers"]:
+        if not offer["source"].startswith("https://"):
+            raise ValueError("Для цены из интернета нужна ссылка на источник")
+        for name in offer["names"]:
+            key = identity(name)
+            if key in offers:
+                raise ValueError(f"Несколько интернет-цен для {name}")
+            offers[key] = offer
+    for item in audit["items"]:
+        if item["price_status"] != "needs_research":
+            continue
+        offer = offers.get(identity(item["name"]))
+        if offer:
+            item.update(price_status="web", price_kgs=str(selling_price(offer["amount"], data["currency"], "web")),
+                        web_price={"amount": offer["amount"], "currency": data["currency"],
+                                   "source": offer["source"], "checked_at": data["checked_at"]})
+    audit["summary"]["web"] = sum(item["price_status"] == "web" for item in audit["items"])
+    audit["summary"]["needs_research"] = sum(item["price_status"] == "needs_research" for item in audit["items"])
+    return audit

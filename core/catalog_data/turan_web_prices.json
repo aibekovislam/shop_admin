@@ -1,0 +1,21 @@
+{
+  "checked_at": "2026-09-05",
+  "currency": "KGS",
+  "offers": [
+    {"names": ["APPLE WATCH 11 46MM JET BLACK (MEUX4)"], "amount": "37999", "source": "https://dns-shop.kg/ru/product/d2e084518dfad0a4/smart-casy-apple-watch-series-11-46-mm/"},
+    {"names": ["GARMIN MARQ AVIATOR GEN 2 EMEA"], "amount": "196240", "source": "https://istore.kg/marq-aviator-gen-2"},
+    {"names": ["IPAD PRO 11\" M5 WIFI 256GB OLED SILVER (MDWL4)"], "amount": "108700", "source": "https://telefon.kg/planshet-apple-ipad-pro-11-m5-256gb-wi-fi"},
+    {"names": ["MACBOOK AIR 15\" 16/256GB SKY BLUE (MC7A4)"], "amount": "117900", "source": "https://telefon.kg/noutbuk-apple-macbook-air-15-3-2025-apple-m4-10-core-cpu-10-core-gpu-16gb-256gb"},
+    {"names": ["MACBOOK NEO 13\" M5 A18PRO 8/256GB SILVER (MHFA4)"], "amount": "69900", "source": "https://telefon.kg/noutbuk-apple-macbook-neo-13-a18-pro-6-core-cpu-5-core-gpu-8gb-256gb-ssd"},
+    {"names": ["POCO F8 PRO 12/512GB BLACK"], "amount": "55700", "source": "https://telefon.kg/smartfon-xiaomi-poco-f8-pro-12-512-eu"},
+    {"names": ["POCO X8 PRO 12/512GB GREEN", "POCO X8 PRO 12/512GB WHITE"], "amount": "40800", "source": "https://telefon.kg/smartfon-xiaomi-poco-x8-pro-5g-12-512-eu"},
+    {"names": ["POCO X8 PRO 8/512GB GREEN", "POCO X8 PRO 8/512GB WHITE"], "amount": "37900", "source": "https://telefon.kg/smartfon-xiaomi-poco-x8-pro-5g-8-512-eu"},
+    {"names": ["POCO X8 PRO MAX 12/256GB BLACK", "POCO X8 PRO MAX 12/256GB BLUE", "POCO X8 PRO MAX 12/256GB WHITE"], "amount": "46700", "source": "https://telefon.kg/smartfon-xiaomi-poco-x8-pro-max-5g-12-256-eu"},
+    {"names": ["POCO X8 PRO MAX 12/512GB BLACK", "POCO X8 PRO MAX 12/512GB BLUE", "POCO X8 PRO MAX 12/512GB WHITE"], "amount": "50400", "source": "https://telefon.kg/smartfon-xiaomi-poco-x8-pro-max-5g-12-512-eu"},
+    {"names": ["XIAOMI REDMI 15 8/256GB BLACK", "XIAOMI REDMI 15 8/256GB GRAY"], "amount": "17700", "source": "https://telefon.kg/xiaomi-redmi-15-8-256gb-eu"},
+    {"names": ["XIAOMI REDMI NOTE 15 PRO 12/512 BLACK"], "amount": "29400", "source": "https://telefon.kg/smartfon-xiaomi-redmi-note-15-pro-4g-12-512-eu"},
+    {"names": ["XIAOMI REDMI NOTE 15 PRO 8/256GB TITANIUM"], "amount": "26800", "source": "https://telefon.kg/smartfon-xiaomi-redmi-note-15-pro-4g-8-256-eu"},
+    {"names": ["Яндекс Станция Лайт2 (Синий) с часами", "Яндекс Станция Лайт2 (Фиолетовый) с часами"], "amount": "6200", "source": "https://telefon.kg/umnaya-kolonka-yandeks-stanciya-lajt-2"},
+    {"names": ["Яндекс Станция Миди (Белый)", "Яндекс Станция Миди (Розовый)", "Яндекс Станция Миди (Черный)"], "amount": "15500", "source": "https://telefon.kg/umnaya-kolonka-yandeks-stanciya-midi"}
+  ]
+}

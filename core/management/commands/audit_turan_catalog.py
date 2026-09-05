@@ -3,7 +3,7 @@ from pathlib import Path
 
 from django.core.management.base import BaseCommand, CommandError
 
-from core.turan_catalog import audit_catalog
+from core.turan_catalog import audit_catalog, fill_web_prices
 
 
 class Command(BaseCommand):
@@ -14,10 +14,13 @@ class Command(BaseCommand):
         parser.add_argument("--prices", required=True)
         parser.add_argument("--sheet", default="Остатки на 04.09.2026")
         parser.add_argument("--output", required=True)
+        parser.add_argument("--with-web-prices", action="store_true")
 
     def handle(self, *args, **options):
         try:
             result = audit_catalog(options["stock"], options["prices"], options["sheet"])
+            if options["with_web_prices"]:
+                result = fill_web_prices(result)
         except (OSError, ValueError, KeyError) as exc:
             raise CommandError(str(exc)) from exc
         Path(options["output"]).write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

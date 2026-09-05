@@ -2,10 +2,20 @@ from decimal import Decimal
 from unittest import TestCase
 from unittest.mock import Mock, patch
 
-from core.turan_catalog import USED, audit_catalog, identity, selling_price, stock_rows
+from core.turan_catalog import USED, audit_catalog, fill_web_prices, identity, selling_price, stock_rows
 
 
 class TuranCatalogTests(TestCase):
+    def test_web_fallback_preserves_wholesale_price(self):
+        audit = {"items": [
+            {"name": "POCO X8 PRO 12/512GB GREEN", "price_status": "matched", "price_kgs": "10000"},
+            {"name": "POCO X8 PRO 12/512GB WHITE", "price_status": "needs_research", "price_kgs": None},
+        ], "summary": {}}
+        filled = fill_web_prices(audit)
+        self.assertEqual(filled["items"][0]["price_kgs"], "10000")
+        self.assertEqual(filled["items"][1]["price_kgs"], "44880")
+        self.assertEqual(filled["summary"]["web"], 1)
+
     def workbook(self, rows, title="Лист1"):
         sheet = Mock(title=title, values=rows)
         book = Mock()
