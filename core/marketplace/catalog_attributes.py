@@ -16,7 +16,7 @@ ALIASES = (
     ("Память", "Объем памяти", "Объем встроенной памяти", "Встроенная память"),
     ("Оперативная память", "Объем оперативной памяти", "ОЗУ"),
     ("Процессор", "Чип"),
-    ("Разъем", "Интерфейс", "Порт зарядки"),
+    ("Разъем", "Интерфейс", "Порт зарядки", "Разъем для зарядки"),
     ("Матрица экрана", "Тип экрана", "Технология экрана"),
     ("Операционная система", "ОС"),
     ("Камера", "Основная камера"),
@@ -25,6 +25,11 @@ ALIASES = (
 
 def label_key(label):
     label = re.sub(r"\s+смартфон(?:ы|ов)?\b", "", str(label), flags=re.I)
+    label = re.sub(
+        r"\s+(?:наушники(?:\s*[,]?\s*(?:и\s+)?гарнитура)?|ноутбуки|ноутбука|планшеты|гаджеты|аудиотехника)\s*$",
+        "", label, flags=re.I,
+    )
+    label = re.sub(r"\s*\((?:ГБ|дюйм)\)\s*$", "", label, flags=re.I)
     label = re.sub(r",\s*(?:ГБ|дюйм[а-я]*)\s*$", "", label, flags=re.I)
     key = normalize(label)
     for aliases in ALIASES:
@@ -70,12 +75,15 @@ def match_attributes(attributes, specs):
                     unresolved.append({"label": label, "reason": "нет подтвержденного значения"})
                 continue
             candidates = {normalize(value)}
+            if key == label_key("Состояние") and normalize(value) in {"новый", "новое", "новые", "new"}:
+                candidates.update({"новый", "новое", "новые"})
             if key in {label_key("Память"), label_key("Оперативная память")}:
                 candidates.add(normalize(re.sub(r"\s*(?:ГБ|GB)$", "", value, flags=re.I)))
             options = attribute.get("values") or attribute.get("options") or []
             found = [option for option in options if normalize(option.get("value") or option.get("name") or "") in candidates]
             if len(found) != 1:
-                unresolved.append({"label": label, "value": value, "reason": "значение отсутствует или неоднозначно"})
+                unresolved.append({"label": label, "value": value, "reason": "значение отсутствует или неоднозначно",
+                                   "required": attribute.get("required") is True or attribute.get("is_required") is True})
                 continue
             attribute_id = int(attribute.get("id") or attribute.get("attribute_id"))
             option = found[0]

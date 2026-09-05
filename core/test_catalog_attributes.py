@@ -4,6 +4,15 @@ from core.marketplace.catalog_attributes import has_brand_dependencies, match_at
 
 
 class CatalogAttributesTests(TestCase):
+    def test_category_suffixes_and_new_condition(self):
+        selected, missing = match_attributes([
+            {"id": 1, "create_label": "Бренд наушники и гарнитура", "values": [{"id": 2, "value": "Apple"}]},
+            {"id": 3, "create_label": "Состояние", "values": [{"id": 4, "value": "Новое"}]},
+            {"id": 5, "create_label": "Оперативная память (ГБ) ноутбуки", "values": [{"id": 6, "value": "8"}]},
+        ], {"Бренд": "Apple", "Состояние": "Новый", "ОЗУ": "8GB"})
+        self.assertEqual(len(selected), 3)
+        self.assertEqual(missing, [])
+
     def test_numeric_memory_options_accept_english_units(self):
         selected, missing = match_attributes([
             {"id": 2, "label": "Объем памяти", "values": [{"id": 21, "value": "256"}]},
