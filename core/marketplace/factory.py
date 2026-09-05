@@ -10,6 +10,7 @@ def get_marketplace_adapter(channel):
         "omarket": OMarketAdapter,
         "omarketshat": OMarketAdapter,
         "bakai": BakaiMarketAdapter,
+        "turan_bakai": BakaiMarketAdapter,
     }
 
 

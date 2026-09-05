@@ -10,13 +10,14 @@ from core.models import Channel, ChannelPrice
 
 logger = logging.getLogger(__name__)
 
-MARKET_ADAPTER_KEYS = ("mmarket", "omarket", "omarketshat", "bakai")
+MARKET_ADAPTER_KEYS = ("mmarket", "omarket", "omarketshat", "bakai", "turan_bakai")
 SHAT_MMARKET_BRANCH_IDS = (677,)
 DEFAULT_BATCH_SIZES = {
     "mmarket": 5000,
     "omarket": 100,
     "omarketshat": 100,
     "bakai": 1000,
+    "turan_bakai": 1000,
 }
 
 
