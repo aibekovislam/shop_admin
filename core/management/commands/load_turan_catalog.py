@@ -31,6 +31,7 @@ class Command(BaseCommand):
         parser.add_argument("--catalog", help="JSON: исходное название Excel -> новая карточка или source_sku")
         parser.add_argument("--report", default="turan_import_report.json")
         parser.add_argument("--send", action="store_true", help="Создать карточки TURAN и отправить в оба маркета")
+        parser.add_argument("--allow-partial", action="store_true", help="Отправить собранные карточки, записав пропущенные в отчет")
 
     def handle(self, *args, **options):
         schema = parse_attrs_document(Path(options["schema"]).read_text(encoding="utf-8"))
@@ -83,9 +84,11 @@ class Command(BaseCommand):
                 {"source_sku": variant.sku, **self.card_from_variant(variant)} for variant in variants
             ]
         self.save_report(options["report"], report)
-        if errors:
+        if errors and not options["allow_partial"]:
             raise CommandError(f"Готово {len(prepared)}/{len(audit['items'])}; не хватает {len(errors)} карточек. "
                                f"Подробности: {options['report']}. БД не изменена, товары не отправлялись.")
+        if not prepared:
+            raise CommandError("Нет собранных карточек для отправки")
         if not options["send"]:
             self.stdout.write(f"Готово {len(prepared)} карточек. Отчет: {options['report']}. БД не изменена.")
             return
